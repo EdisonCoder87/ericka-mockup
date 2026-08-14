@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Timesheet — Ericka VA Portal</title>
+<link rel="stylesheet" href="ericka.css">
+</head>
+<body>
+
+<input type="checkbox" id="navtog">
+<div class="app-topbar">
+  <label class="burger" for="navtog"><span></span><span></span><span></span></label>
+  <div class="wm rev">Erick<span class="a">a</span></div>
+</div>
+
+<nav class="app-sidebar">
+  <div class="sidebar-brand">
+    <div class="wm rev">Erick<span class="a">a</span></div>
+    <svg class="pulse" viewBox="0 0 90 14" preserveAspectRatio="none"><path d="M2 7 H32 l4 -5 l5 10 l4 -8 l3 3 H88"/></svg>
+  </div>
+  <div class="nav-group-label">My portal</div>
+  <a href="05_va_home.html"><span class="ic">🏠</span> Home</a>
+  <a href="06_va_training.html"><span class="ic">🎓</span> My Training</a>
+  <a href="07_va_timesheet.html" class="active"><span class="ic">🕑</span> My Timesheet</a>
+  <a href="01_welcome.html" class="logout"><span class="ic">↩</span> Sign out</a>
+</nav>
+
+<div class="page">
+  <div class="phead">
+    <div class="phead-inner">
+      <div>
+        <h1>My Timesheet</h1>
+        <div class="sub">Bea Villanueva · SIA Medical · week of 10–16 Aug 2026</div>
+      </div>
+      <span class="chip chip-medical" style="padding:9px 18px;font-size:13px">🩺 SIA Medical</span>
+    </div>
+  </div>
+
+  <div class="wrap">
+
+    <!-- Clock in/out hero -->
+    <div class="panel" style="padding:0;overflow:hidden;margin-bottom:26px">
+      <div style="background:linear-gradient(135deg,var(--violet-dd),var(--violet-d));color:#fff;padding:30px 30px;display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--lilt)">Currently</div>
+          <div style="font-family:var(--f-display);font-weight:600;font-size:30px;margin-top:4px">🟢 Clocked in</div>
+          <div style="font-size:14px;color:rgba(255,255,255,.8);margin-top:4px">Since 9:02am · 6h 14m so far today</div>
+        </div>
+        <button class="btn" style="background:#fff;color:var(--violet-d);font-size:16px;padding:16px 34px">■ Clock out</button>
+      </div>
+    </div>
+
+    <!-- Week summary -->
+    <div class="cards c3" style="margin-bottom:26px">
+      <div class="panel" style="padding:20px 22px"><div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--grey)">This week</div><div style="font-family:var(--f-display);font-weight:600;font-size:30px;margin-top:4px;color:var(--violet)">40.0</div><div style="font-size:12px;color:var(--grey)">hours logged</div></div>
+      <div class="panel" style="padding:20px 22px"><div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--grey)">Days worked</div><div style="font-family:var(--f-display);font-weight:600;font-size:30px;margin-top:4px">5</div><div style="font-size:12px;color:var(--grey)">Mon–Fri</div></div>
+      <div class="panel" style="padding:20px 22px"><div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--grey)">Status</div><div style="font-family:var(--f-display);font-weight:600;font-size:24px;margin-top:8px"><span class="chip chip-ok" style="font-size:13px">Approved</span></div></div>
+    </div>
+
+    <!-- Daily log -->
+    <div class="section-h">This week's log <span>your clock in / out</span></div>
+    <div class="panel">
+      <table>
+        <thead>
+          <tr><th>Day</th><th>Clock in</th><th>Clock out</th><th>Break</th><th style="text-align:right">Hours</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Mon 10</td><td>9:00am</td><td>5:30pm</td><td>30m</td><td style="text-align:right;font-weight:700">8.0</td></tr>
+          <tr><td>Tue 11</td><td>9:00am</td><td>5:30pm</td><td>30m</td><td style="text-align:right;font-weight:700">8.0</td></tr>
+          <tr><td>Wed 12</td><td>9:00am</td><td>5:30pm</td><td>30m</td><td style="text-align:right;font-weight:700">8.0</td></tr>
+          <tr><td>Thu 13</td><td>9:00am</td><td>5:30pm</td><td>30m</td><td style="text-align:right;font-weight:700">8.0</td></tr>
+          <tr><td>Fri 14 <span style="color:var(--violet);font-weight:700">· today</span></td><td>9:02am</td><td><span style="color:var(--grey)">— in progress —</span></td><td>30m</td><td style="text-align:right;font-weight:700">8.0</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="font-size:12px;color:var(--grey);margin-top:16px">
+      Mockup only — the real version records exact clock-in/out timestamps that can't be edited (corrections are logged separately), so the sheet is payroll-ready.
+    </p>
+
+  </div>
+</div>
+</body>
+</html>

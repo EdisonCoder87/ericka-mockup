@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Timesheets — Ericka Team Portal</title>
+<link rel="stylesheet" href="ericka.css">
+</head>
+<body>
+
+<input type="checkbox" id="navtog">
+<div class="app-topbar">
+  <label class="burger" for="navtog"><span></span><span></span><span></span></label>
+  <div class="wm rev">Erick<span class="a">a</span></div>
+</div>
+
+<nav class="app-sidebar">
+  <div class="sidebar-brand">
+    <div class="wm rev">Erick<span class="a">a</span></div>
+    <svg class="pulse" viewBox="0 0 90 14" preserveAspectRatio="none"><path d="M2 7 H32 l4 -5 l5 10 l4 -8 l3 3 H88"/></svg>
+  </div>
+  <div class="nav-group-label">Main</div>
+  <a href="02_home.html"><span class="ic">🏠</span> Home</a>
+  <a href="03_training.html"><span class="ic">🎓</span> Training</a>
+  <a href="04_timesheets.html" class="active"><span class="ic">🕑</span> Timesheets</a>
+  <div class="nav-group-label">Manage</div>
+  <a href="#"><span class="ic">👥</span> Team</a>
+  <a href="#"><span class="ic">📊</span> Reports</a>
+  <a href="#"><span class="ic">⚙️</span> Admin</a>
+  <a href="01_welcome.html" class="logout"><span class="ic">↩</span> Sign out</a>
+</nav>
+
+<div class="page">
+  <div class="phead">
+    <div class="phead-inner">
+      <div>
+        <h1>Timesheets</h1>
+        <div class="sub">Week of 10–16 Aug 2026 · hours by VA and client</div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <a href="#" class="btn btn-ghost">◀ Prev week</a>
+        <a href="#" class="btn btn-primary">Export for payroll ↓</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+
+    <!-- KPI strip -->
+    <div class="cards c3" style="margin-bottom:8px">
+      <div class="panel" style="padding:20px 22px"><div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--grey)">Total hours</div><div style="font-family:var(--f-display);font-weight:600;font-size:30px;margin-top:4px">486.5</div><div style="font-size:12px;color:var(--grey)">across 14 VAs</div></div>
+      <div class="panel" style="padding:20px 22px"><div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--grey)">SIA Dental</div><div style="font-family:var(--f-display);font-weight:600;font-size:30px;margin-top:4px;color:var(--violet)">312.0</div><div style="font-size:12px;color:var(--grey)">9 VAs</div></div>
+      <div class="panel" style="padding:20px 22px"><div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--grey)">SIA Medical</div><div style="font-family:var(--f-display);font-weight:600;font-size:30px;margin-top:4px;color:var(--gold-text)">174.5</div><div style="font-size:12px;color:var(--grey)">5 VAs</div></div>
+    </div>
+
+    <!-- Filter chips -->
+    <div style="display:flex;gap:8px;margin:22px 0 14px;flex-wrap:wrap">
+      <span class="btn btn-primary" style="padding:8px 18px;font-size:13px">All clients</span>
+      <span class="btn btn-ghost" style="padding:8px 18px;font-size:13px">SIA Dental</span>
+      <span class="btn btn-ghost" style="padding:8px 18px;font-size:13px">SIA Medical</span>
+    </div>
+
+    <!-- Timesheet table -->
+    <div class="panel">
+      <table>
+        <thead>
+          <tr>
+            <th>VA</th><th>Client</th>
+            <th style="text-align:center">Mon</th><th style="text-align:center">Tue</th><th style="text-align:center">Wed</th>
+            <th style="text-align:center">Thu</th><th style="text-align:center">Fri</th>
+            <th style="text-align:right">Total</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><div class="who"><div class="avatar">ED</div>Ericka Dela Cruz</div></td>
+            <td><span class="chip chip-dental">SIA Dental</span></td>
+            <td style="text-align:center">8.0</td><td style="text-align:center">7.5</td><td style="text-align:center">8.0</td><td style="text-align:center">8.0</td><td style="text-align:center">6.0</td>
+            <td style="text-align:right;font-weight:700">37.5</td><td><span class="chip chip-ok">Approved</span></td>
+          </tr>
+          <tr>
+            <td><div class="who"><div class="avatar">AR</div>Angelica Reyes</div></td>
+            <td><span class="chip chip-dental">SIA Dental</span></td>
+            <td style="text-align:center">8.0</td><td style="text-align:center">8.0</td><td style="text-align:center">—</td><td style="text-align:center">8.0</td><td style="text-align:center">8.0</td>
+            <td style="text-align:right;font-weight:700">32.0</td><td><span class="chip chip-ok">Approved</span></td>
+          </tr>
+          <tr>
+            <td><div class="who"><div class="avatar">MS</div>Marco Santos</div></td>
+            <td><span class="chip chip-dental">SIA Dental</span></td>
+            <td style="text-align:center">7.5</td><td style="text-align:center">7.5</td><td style="text-align:center">7.5</td><td style="text-align:center">7.5</td><td style="text-align:center">4.0</td>
+            <td style="text-align:right;font-weight:700">34.0</td><td><span class="chip chip-open">Pending</span></td>
+          </tr>
+          <tr>
+            <td><div class="who"><div class="avatar gold">BV</div>Bea Villanueva</div></td>
+            <td><span class="chip chip-medical">SIA Medical</span></td>
+            <td style="text-align:center">8.0</td><td style="text-align:center">8.0</td><td style="text-align:center">8.0</td><td style="text-align:center">8.0</td><td style="text-align:center">8.0</td>
+            <td style="text-align:right;font-weight:700">40.0</td><td><span class="chip chip-ok">Approved</span></td>
+          </tr>
+          <tr>
+            <td><div class="who"><div class="avatar gold">JT</div>Joy Tolentino</div></td>
+            <td><span class="chip chip-medical">SIA Medical</span></td>
+            <td style="text-align:center">6.0</td><td style="text-align:center">8.0</td><td style="text-align:center">8.0</td><td style="text-align:center">—</td><td style="text-align:center">8.0</td>
+            <td style="text-align:right;font-weight:700">30.0</td><td><span class="chip chip-open">Pending</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="font-size:12px;color:var(--grey);margin-top:16px">
+      Mockup only — in the real portal each row expands to show clock-in/out times, and the VA logs their own hours from a simple “Clock in / Clock out” screen.
+    </p>
+
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Training — Ericka Team Portal</title>
+<link rel="stylesheet" href="ericka.css">
+</head>
+<body>
+
+<input type="checkbox" id="navtog">
+<div class="app-topbar">
+  <label class="burger" for="navtog"><span></span><span></span><span></span></label>
+  <div class="wm rev">Erick<span class="a">a</span></div>
+</div>
+
+<nav class="app-sidebar">
+  <div class="sidebar-brand">
+    <div class="wm rev">Erick<span class="a">a</span></div>
+    <svg class="pulse" viewBox="0 0 90 14" preserveAspectRatio="none"><path d="M2 7 H32 l4 -5 l5 10 l4 -8 l3 3 H88"/></svg>
+  </div>
+  <div class="nav-group-label">Main</div>
+  <a href="02_home.html"><span class="ic">🏠</span> Home</a>
+  <a href="03_training.html" class="active"><span class="ic">🎓</span> Training</a>
+  <a href="04_timesheets.html"><span class="ic">🕑</span> Timesheets</a>
+  <div class="nav-group-label">Manage</div>
+  <a href="#"><span class="ic">👥</span> Team</a>
+  <a href="#"><span class="ic">📊</span> Reports</a>
+  <a href="#"><span class="ic">⚙️</span> Admin</a>
+  <a href="01_welcome.html" class="logout"><span class="ic">↩</span> Sign out</a>
+</nav>
+
+<div class="page">
+  <div class="phead">
+    <div class="phead-inner">
+      <div>
+        <h1>Training</h1>
+        <div class="sub">Choose a track — content adapts to the client the VA supports.</div>
+      </div>
+      <div class="tabs">
+        <button id="t-dental" class="on dental" onclick="showTrack('dental')">🦷 Dental</button>
+        <button id="t-medical" onclick="showTrack('medical')">🩺 Medical</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+
+    <!-- ── DENTAL TRACK ── -->
+    <div id="track-dental">
+      <div class="panel" style="padding:22px 24px;display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:26px">
+        <div>
+          <div class="chip chip-dental">Dental track</div>
+          <div style="font-family:var(--f-display);font-weight:600;font-size:20px;margin-top:8px">Front-desk foundations for dental VAs</div>
+          <div style="font-size:13px;color:var(--grey);margin-top:4px">6 modules · anchor client: SIA Dental</div>
+        </div>
+        <div style="min-width:180px">
+          <div style="font-size:12px;color:var(--grey);font-weight:600">Team completion</div>
+          <div class="pbar"><span style="width:72%"></span></div>
+          <div style="font-size:12px;color:var(--grey);margin-top:6px">72% across 9 VAs</div>
+        </div>
+      </div>
+
+      <div class="section-h">Modules <span>learn → quiz → practice</span></div>
+      <div class="cards c3">
+        <a href="#" class="ac"><span class="tag tag-dental">Module 1</span><span class="ic">👋</span><div class="t">Welcome &amp; the Ericka Way</div><div class="d">Who we are, malasakit, and what great clinic support looks like.</div><span class="cta">Start →</span></a>
+        <a href="#" class="ac"><span class="tag tag-dental">Module 2</span><span class="ic">📞</span><div class="t">Phone &amp; Booking Skills</div><div class="d">Handling inbound calls, booking conversations and objection basics.</div><span class="cta">Start →</span></a>
+        <a href="#" class="ac"><span class="tag tag-dental">Module 3</span><span class="ic">💻</span><div class="t">Dental4Web (D4W)</div><div class="d">Navigating the practice management system used across SIA sites.</div><span class="cta">Start →</span></a>
+        <a href="#" class="ac"><span class="tag tag-dental">Module 4</span><span class="ic">💳</span><div class="t">Billing &amp; HICAPS</div><div class="d">Health funds, gap payments and processing claims correctly.</div><span class="cta">Start →</span></a>
+        <a href="#" class="ac"><span class="tag tag-dental">Module 5</span><span class="ic">🦷</span><div class="t">Dental Basics &amp; Lingo</div><div class="d">Tooth numbering, common procedures and reading a treatment plan.</div><span class="cta">Start →</span></a>
+        <a href="#" class="ac"><span class="tag tag-dental">Module 6</span><span class="ic">🔁</span><div class="t">Recalls &amp; Reactivation</div><div class="d">Outbound recall calls and reactivating lapsed patients.</div><span class="cta">Start →</span></a>
+      </div>
+    </div>
+
+    <!-- ── MEDICAL TRACK ── -->
+    <div id="track-medical" style="display:none">
+      <div class="panel" style="padding:22px 24px;display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:26px">
+        <div>
+          <div class="chip chip-medical">Medical track</div>
+          <div style="font-family:var(--f-display);font-weight:600;font-size:20px;margin-top:8px">Front-desk foundations for medical VAs</div>
+          <div style="font-size:13px;color:var(--grey);margin-top:4px">6 modules · anchor client: SIA Medical</div>
+        </div>
+        <div style="min-width:180px">
+          <div style="font-size:12px;color:var(--grey);font-weight:600">Team completion</div>
+          <div class="pbar gold"><span style="width:54%"></span></div>
+          <div style="font-size:12px;color:var(--grey);margin-top:6px">54% across 5 VAs</div>
+        </div>
+      </div>
+
+      <div class="section-h">Modules <span>learn → quiz → practice</span></div>
+      <div class="cards c3">
+        <a href="#" class="ac"><span class="tag tag-medical">Module 1</span><span class="ic">👋</span><div class="t">Welcome &amp; the Ericka Way</div><div class="d">Who we are, malasakit, and what great clinic support looks like.</div><span class="cta">Start →</span></a>
+        <a href="#" class="ac"><span class="tag tag-medical">Module 2</span><span class="ic">📞</span><div class="t">Medical Front-Desk Calls</div><div class="d">Triage-aware phone handling, appointment types and urgency cues.</div><span class="cta">Start →</span></a>
+        <a href="#" class="ac"><span class="tag tag-medical">Module 3</span><span class="ic">💻</span><div class="t">Practice Software</div><div class="d">Best Practice / clinic systems — booking, recalls and records.</div><span class="cta">Start →</span></a>
+        <a href="#" class="ac"><span class="tag tag-medical">Module 4</span><span class="ic">🩺</span><div class="t">Medicare &amp; Bulk Billing</div><div class="d">Item numbers, bulk billing vs private, and DVA basics.</div><span class="cta">Start →</span></a>
+        <a href="#" class="ac"><span class="tag tag-medical">Module 5</span><span class="ic">📋</span><div class="t">Results &amp; Recalls</div><div class="d">Handling results workflow, recall lists and clinician instructions.</div><span class="cta">Start →</span></a>
+        <a href="#" class="ac"><span class="tag tag-medical">Module 6</span><span class="ic">🔒</span><div class="t">Privacy &amp; Compliance</div><div class="d">Handling sensitive health data and consent the right way.</div><span class="cta">Start →</span></a>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function showTrack(which){
+  var dental = which === 'dental';
+  document.getElementById('track-dental').style.display  = dental ? '' : 'none';
+  document.getElementById('track-medical').style.display = dental ? 'none' : '';
+  var td = document.getElementById('t-dental'), tm = document.getElementById('t-medical');
+  td.className = dental ? 'on dental' : ''; tm.className = dental ? '' : 'on medical';
+}
+if (location.hash === '#medical') showTrack('medical');
+</script>
+</body>
+</html>

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Home — Ericka VA Portal</title>
+<link rel="stylesheet" href="ericka.css">
+</head>
+<body>
+
+<input type="checkbox" id="navtog">
+<div class="app-topbar">
+  <label class="burger" for="navtog"><span></span><span></span><span></span></label>
+  <div class="wm rev">Erick<span class="a">a</span></div>
+</div>
+
+<!-- VA sidebar — reduced: no Team / Reports / Admin -->
+<nav class="app-sidebar">
+  <div class="sidebar-brand">
+    <div class="wm rev">Erick<span class="a">a</span></div>
+    <svg class="pulse" viewBox="0 0 90 14" preserveAspectRatio="none"><path d="M2 7 H32 l4 -5 l5 10 l4 -8 l3 3 H88"/></svg>
+  </div>
+  <div class="nav-group-label">My portal</div>
+  <a href="05_va_home.html" class="active"><span class="ic">🏠</span> Home</a>
+  <a href="06_va_training.html"><span class="ic">🎓</span> My Training</a>
+  <a href="07_va_timesheet.html"><span class="ic">🕑</span> My Timesheet</a>
+  <a href="01_welcome.html" class="logout"><span class="ic">↩</span> Sign out</a>
+</nav>
+
+<div class="page">
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-inner">
+      <div class="hero-left">
+        <div class="hero-label">Welcome back</div>
+        <h1 class="hero-name">Hi Bea 👋</h1>
+        <p class="hero-tagline">Thanks for the care you bring to SIA Medical every day. Here's where you're up to.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <span class="badge-pill" style="border-color:var(--gold);color:#fff;background:rgba(193,149,63,.22)">
+            <span class="dot" style="background:var(--gold)"></span> Medical VA
+          </span>
+          <span class="badge-pill" style="border-color:var(--lilt);color:#fff;background:rgba(255,255,255,.1)">
+            <span class="dot"></span> SIA Medical
+          </span>
+        </div>
+      </div>
+      <div class="hero-right">
+        <div class="stat"><div class="v">4/6</div><div class="l">Modules</div></div>
+        <div class="stat"><div class="v">40.0</div><div class="l">Hrs this wk</div></div>
+        <div class="stat"><div class="v">🔥7</div><div class="l">Day streak</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+
+    <!-- Clock-in strip -->
+    <a href="07_va_timesheet.html" style="text-decoration:none;display:block">
+      <div class="panel" style="padding:22px 24px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;background:linear-gradient(135deg,var(--violet-d),var(--violet));border:none;color:#fff">
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--lilt)">🕑 Today</div>
+          <div style="font-family:var(--f-display);font-weight:600;font-size:22px;margin-top:5px">You're clocked in since 9:02am</div>
+          <div style="font-size:13px;color:rgba(255,255,255,.8);margin-top:2px">Don't forget to clock out at the end of your shift.</div>
+        </div>
+        <span class="btn" style="background:#fff;color:var(--violet-d)">Clock out →</span>
+      </div>
+    </a>
+
+    <div class="section-h">Keep going <span>your medical track</span></div>
+    <div class="cards c2">
+      <a href="06_va_training.html" class="ac">
+        <span class="tag tag-medical">Next up</span>
+        <span class="ic">📋</span>
+        <div class="t">Module 5 · Results &amp; Recalls</div>
+        <div class="d">You're 4 of 6 modules through the medical track. Pick up where you left off.</div>
+        <div class="pbar gold"><span style="width:67%"></span></div>
+        <span class="cta">Continue training →</span>
+      </a>
+      <a href="07_va_timesheet.html" class="ac">
+        <span class="ic">🕑</span>
+        <div class="t">My Timesheet</div>
+        <div class="d">Clock in and out, and see the hours you've logged this week for SIA Medical.</div>
+        <span class="cta">Open my timesheet →</span>
+      </a>
+    </div>
+
+    <div class="quote">
+      <div class="qm">"</div>
+      <div>
+        <div class="qb">Every patient you help is someone's parent, child or friend. That's the malasakit we carry.</div>
+        <div class="qa">— The Ericka Way</div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

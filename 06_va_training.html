@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Training — Ericka VA Portal</title>
+<link rel="stylesheet" href="ericka.css">
+</head>
+<body>
+
+<input type="checkbox" id="navtog">
+<div class="app-topbar">
+  <label class="burger" for="navtog"><span></span><span></span><span></span></label>
+  <div class="wm rev">Erick<span class="a">a</span></div>
+</div>
+
+<nav class="app-sidebar">
+  <div class="sidebar-brand">
+    <div class="wm rev">Erick<span class="a">a</span></div>
+    <svg class="pulse" viewBox="0 0 90 14" preserveAspectRatio="none"><path d="M2 7 H32 l4 -5 l5 10 l4 -8 l3 3 H88"/></svg>
+  </div>
+  <div class="nav-group-label">My portal</div>
+  <a href="05_va_home.html"><span class="ic">🏠</span> Home</a>
+  <a href="06_va_training.html" class="active"><span class="ic">🎓</span> My Training</a>
+  <a href="07_va_timesheet.html"><span class="ic">🕑</span> My Timesheet</a>
+  <a href="01_welcome.html" class="logout"><span class="ic">↩</span> Sign out</a>
+</nav>
+
+<div class="page">
+  <div class="phead">
+    <div class="phead-inner">
+      <div>
+        <h1>My Training</h1>
+        <div class="sub">Your track is set by your role — you're on the <b>Medical</b> track.</div>
+      </div>
+      <!-- Gated: single locked track pill, NOT a toggle -->
+      <span class="chip chip-medical" style="padding:9px 18px;font-size:13px">🩺 Medical track · assigned to you</span>
+    </div>
+  </div>
+
+  <div class="wrap">
+
+    <div class="panel" style="padding:22px 24px;display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:26px">
+      <div>
+        <div style="font-family:var(--f-display);font-weight:600;font-size:20px">Front-desk foundations for medical VAs</div>
+        <div style="font-size:13px;color:var(--grey);margin-top:4px">6 modules · learn → quiz → practice</div>
+      </div>
+      <div style="min-width:180px">
+        <div style="font-size:12px;color:var(--grey);font-weight:600">Your progress</div>
+        <div class="pbar gold"><span style="width:67%"></span></div>
+        <div style="font-size:12px;color:var(--grey);margin-top:6px">4 of 6 complete</div>
+      </div>
+    </div>
+
+    <div class="section-h">Modules <span>work through them in order</span></div>
+    <div class="cards c3">
+      <a href="#" class="ac"><span class="tag tag-medical" style="background:#e4f4ec;color:var(--ok)">✓ Done</span><span class="ic">👋</span><div class="t">Welcome &amp; the Ericka Way</div><div class="d">Who we are and what great clinic support looks like.</div><span class="cta">Review →</span></a>
+      <a href="#" class="ac"><span class="tag tag-medical" style="background:#e4f4ec;color:var(--ok)">✓ Done</span><span class="ic">📞</span><div class="t">Medical Front-Desk Calls</div><div class="d">Triage-aware phone handling and appointment types.</div><span class="cta">Review →</span></a>
+      <a href="#" class="ac"><span class="tag tag-medical" style="background:#e4f4ec;color:var(--ok)">✓ Done</span><span class="ic">💻</span><div class="t">Practice Software</div><div class="d">Booking, recalls and records in the clinic system.</div><span class="cta">Review →</span></a>
+      <a href="#" class="ac"><span class="tag tag-medical" style="background:#e4f4ec;color:var(--ok)">✓ Done</span><span class="ic">🩺</span><div class="t">Medicare &amp; Bulk Billing</div><div class="d">Item numbers, bulk billing vs private, DVA basics.</div><span class="cta">Review →</span></a>
+      <a href="#" class="ac" style="border-color:var(--gold);box-shadow:0 8px 26px rgba(193,149,63,.18)"><span class="tag tag-medical">▶ Next up</span><span class="ic">📋</span><div class="t">Results &amp; Recalls</div><div class="d">Results workflow, recall lists and clinician instructions.</div><span class="cta">Start module →</span></a>
+      <div class="ac" style="opacity:.55;cursor:not-allowed"><span class="tag" style="background:var(--line);color:var(--grey)">🔒 Locked</span><span class="ic">🔒</span><div class="t">Privacy &amp; Compliance</div><div class="d">Unlocks when you finish Module 5.</div><span class="cta" style="color:var(--grey)">Locked</span></div>
+    </div>
+
+    <!-- Future third track — visual placeholder -->
+    <div class="section-h">Coming soon <span>for every ericka va</span></div>
+    <div class="cards c2">
+      <div class="ac" style="opacity:.7;cursor:default;border-style:dashed">
+        <span class="tag" style="background:var(--mist);color:var(--violet-d)">General VA</span>
+        <span class="ic">🌱</span>
+        <div class="t">General VA Skills <span style="font-size:12px;color:var(--grey);font-weight:600">· coming soon</span></div>
+        <div class="d">Cross-vertical basics every Ericka VA will complete — communication, tools, time management and the Ericka standard — regardless of dental or medical.</div>
+        <span class="cta" style="color:var(--grey)">Not yet available</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>
