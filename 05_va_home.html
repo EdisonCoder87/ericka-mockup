@@ -67,13 +67,13 @@
 
     <div class="section-h">Keep going <span>your training track</span></div>
     <div class="cards c2">
-      <a href="06_va_training.html" class="ac">
-        <span class="tag tag-medical">Next up</span>
+      <a href="06_va_training.html" class="ac" id="next-link">
+        <span class="tag tag-medical" id="next-tag">Next up</span>
         <span class="ic">📋</span>
         <div class="t" id="next-mod">Your training</div>
         <div class="d" id="next-mod-d">Pick up where you left off.</div>
         <div class="pbar gold"><span id="train-bar" style="width:0%"></span></div>
-        <span class="cta">Continue training →</span>
+        <span class="cta">Continue →</span>
       </a>
       <a href="07_va_timesheet.html" class="ac">
         <span class="ic">🕑</span>
@@ -121,11 +121,15 @@
   document.getElementById('train-bar').style.width = (mods.length ? Math.round(doneCount/mods.length*100) : 0) + '%';
   const next = mods.find(m => done.indexOf(m.id) === -1);
   if (next) {
+    const isOnb = next.category === 'onboarding';
+    document.getElementById('next-tag').textContent = isOnb ? 'Onboarding · next up' : 'Training · next up';
     document.getElementById('next-mod').textContent = 'Module ' + next.ord + ' · ' + next.title;
-    document.getElementById('next-mod-d').textContent = "You're " + doneCount + ' of ' + mods.length + ' modules through your track.';
+    document.getElementById('next-mod-d').textContent = "You're " + doneCount + ' of ' + mods.length + ' modules through your path.';
+    document.getElementById('next-link').href = 'module.html?id=' + next.id;
   } else {
+    document.getElementById('next-tag').textContent = 'Complete';
     document.getElementById('next-mod').textContent = 'All modules complete 🎉';
-    document.getElementById('next-mod-d').textContent = 'Nice work — you\'ve finished your track.';
+    document.getElementById('next-mod-d').textContent = "Nice work — you've finished your onboarding and training.";
   }
 
   // hours this week

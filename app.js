@@ -143,11 +143,20 @@
     if (error) throw error;
     return (data || []).map(r => r.module_id);
   }
-  async function completeModule(userId, moduleId) {
-    const { error } = await sb.from("training_progress")
-      .insert({ user_id: userId, module_id: moduleId });
-    // ignore duplicate-key (already complete)
+  async function completeModule(userId, moduleId, score) {
+    const row = { user_id: userId, module_id: moduleId };
+    if (typeof score === "number") row.score = score;
+    const { error } = await sb.from("training_progress").insert(row);
+    // ignore duplicate-key (already complete — first pass sticks)
     if (error && error.code !== "23505") throw error;
+  }
+  // Quiz questions for a module (empty array = no quiz, use mark-complete).
+  async function quizFor(moduleId) {
+    const { data, error } = await sb.from("quiz_questions")
+      .select("ord,question,options,correct,explanation")
+      .eq("module_id", moduleId).order("ord");
+    if (error) throw error;
+    return data || [];
   }
 
   /* ---- client-admin board (view-only, scoped to one client) ------------- */
@@ -259,7 +268,7 @@
     session, setSession, logout, requireRole, homeFor, login,
     weekStart, hoursBetween,
     openShift, clockIn, clockOut, weekShifts, sumHours,
-    modulesFor, moduleWithSections, progressFor, completeModule,
+    modulesFor, moduleWithSections, progressFor, completeModule, quizFor,
     cheatsheetForSite, siteHasCheatsheet, revealCheatsheetNav,
     clientBoard, teamBoard, adminStats,
     // small helper: bail out gracefully if keys aren't set yet

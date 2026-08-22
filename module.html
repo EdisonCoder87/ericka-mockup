@@ -21,6 +21,20 @@
   .md th{background:var(--cream);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--grey)}
   .md code{background:var(--mist);padding:1px 5px;border-radius:4px;font-size:13px}
   .done-banner{background:#e4f4ec;color:var(--ok);border:1px solid #bfe6cf;border-radius:var(--r-md);padding:14px 18px;font-weight:700;text-align:center;margin-bottom:18px}
+  .quiz{background:#fff;border:1.5px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow-sm);padding:24px 26px;margin-top:8px}
+  .quiz h3{font-family:var(--f-display);font-weight:600;font-size:20px;margin-bottom:6px}
+  .q{padding:16px 0;border-bottom:1px solid var(--line)}
+  .q:last-of-type{border-bottom:none}
+  .q .qt{font-weight:700;font-size:15px;margin-bottom:10px;color:var(--ink)}
+  .opt{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;margin-bottom:8px;cursor:pointer;font-size:14px;transition:all .12s}
+  .opt:hover{border-color:var(--violet)}
+  .opt input{width:auto;margin:0}
+  .opt.correct{border-color:var(--ok);background:#e4f4ec}
+  .opt.wrong{border-color:var(--danger);background:#fbeae8}
+  .expl{font-size:13px;color:var(--grey);margin-top:6px;padding:8px 12px;background:var(--cream);border-radius:8px}
+  .quiz-result{text-align:center;font-weight:700;padding:12px;border-radius:10px;margin-bottom:14px}
+  .quiz-result.pass{background:#e4f4ec;color:var(--ok)}
+  .quiz-result.fail{background:#fdf2e0;color:var(--warn)}
 </style>
 </head>
 <body>
@@ -74,7 +88,19 @@
   if (isDone) document.getElementById('done-banner').style.display = 'block';
 
   const cta = document.getElementById('cta');
-  if (s.role === 'va' && !isDone) {
+  const PASS = 75;             // percent needed to pass
+  const backHome = isOnb ? '05_va_home.html' : '06_va_training.html';
+
+  if (s.role !== 'va') {
+    cta.innerHTML = '<p style="color:var(--grey);font-size:13px">Manager view — read only.</p>';
+    return;
+  }
+  if (isDone) return;          // already complete, nothing to do
+
+  const quiz = await ericka.quizFor(mod.id);
+
+  // No quiz for this module → simple mark-complete
+  if (!quiz.length) {
     const btn = document.createElement('button');
     btn.className = 'btn btn-primary';
     btn.style.padding = '15px 40px';
@@ -82,12 +108,72 @@
     btn.onclick = async function () {
       btn.disabled = true; btn.textContent = 'Saving…';
       await ericka.completeModule(s.id, mod.id);
-      location.href = (isOnb ? '05_va_home.html' : '06_va_training.html');
+      location.href = backHome;
     };
     cta.appendChild(btn);
-  } else if (s.role !== 'va') {
-    cta.innerHTML = '<p style="color:var(--grey);font-size:13px">Manager view — read only.</p>';
+    return;
   }
+
+  // Quiz → must pass to complete
+  function renderQuiz() {
+    cta.innerHTML =
+      '<div class="quiz"><h3>Quick quiz</h3>'
+      + '<p style="color:var(--grey);font-size:13px;margin-bottom:8px">Answer all questions — you need '
+      + PASS + '% to complete this module.</p>'
+      + '<div id="qresult"></div>'
+      + quiz.map(function (q, qi) {
+          return '<div class="q" data-qi="' + qi + '"><div class="qt">' + (qi+1) + '. ' + q.question + '</div>'
+            + q.options.map(function (opt, oi) {
+                return '<label class="opt" data-oi="' + oi + '"><input type="radio" name="q' + qi + '" value="' + oi + '"> <span>' + opt + '</span></label>';
+              }).join('')
+            + '<div class="expl" style="display:none"></div></div>';
+        }).join('')
+      + '<button id="q-submit" class="btn btn-primary" style="padding:14px 34px;margin-top:8px">Submit answers</button></div>';
+
+    document.getElementById('q-submit').onclick = grade;
+  }
+
+  function grade() {
+    let correct = 0;
+    let answeredAll = true;
+    quiz.forEach(function (q, qi) {
+      const picked = document.querySelector('input[name="q' + qi + '"]:checked');
+      const qEl = document.querySelector('.q[data-qi="' + qi + '"]');
+      // reset styles
+      qEl.querySelectorAll('.opt').forEach(o => o.classList.remove('correct','wrong'));
+      const expl = qEl.querySelector('.expl');
+      if (!picked) { answeredAll = false; expl.style.display = 'none'; return; }
+      const val = parseInt(picked.value, 10);
+      if (val === q.correct) correct++;
+      // mark correct + the wrong pick
+      qEl.querySelector('.opt[data-oi="' + q.correct + '"]').classList.add('correct');
+      if (val !== q.correct) qEl.querySelector('.opt[data-oi="' + val + '"]').classList.add('wrong');
+      if (q.explanation) { expl.textContent = q.explanation; expl.style.display = 'block'; }
+    });
+
+    const result = document.getElementById('qresult');
+    if (!answeredAll) {
+      result.className = 'quiz-result fail';
+      result.textContent = 'Please answer every question before submitting.';
+      return;
+    }
+    const pct = Math.round(correct / quiz.length * 100);
+    if (pct >= PASS) {
+      result.className = 'quiz-result pass';
+      result.textContent = 'Passed — ' + pct + '% (' + correct + '/' + quiz.length + '). Saving…';
+      const btn = document.getElementById('q-submit');
+      btn.disabled = true;
+      ericka.completeModule(s.id, mod.id, pct).then(function () {
+        location.href = backHome;
+      });
+    } else {
+      result.className = 'quiz-result fail';
+      result.textContent = 'Not quite — ' + pct + '% (' + correct + '/' + quiz.length + '). Review the answers below and try again.';
+      document.getElementById('q-submit').textContent = 'Try again';
+    }
+  }
+
+  renderQuiz();
 })();
 </script>
 </body>
