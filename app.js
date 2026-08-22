@@ -159,6 +159,30 @@
     return data || [];
   }
 
+  /* ---- productivity (team-lead entered) --------------------------------- */
+  // Latest productivity row for a VA (null if none / table not present yet).
+  async function productivityFor(userId) {
+    try {
+      const { data, error } = await sb.from("productivity")
+        .select("*").eq("user_id", userId)
+        .order("updated_at", { ascending: false }).limit(1).maybeSingle();
+      if (error) throw error;
+      return data;
+    } catch (e) { return null; }   // table may not exist until migration 05 runs
+  }
+  async function saveProductivity(p) {
+    const row = {
+      user_id: p.userId, client_id: p.clientId || null,
+      period_label: p.period,
+      calls: p.calls || 0, bookings: p.bookings || 0, payments: p.payments || 0,
+      notes: p.notes || null, updated_by: p.by || null,
+      updated_at: new Date().toISOString()
+    };
+    const { error } = await sb.from("productivity")
+      .upsert(row, { onConflict: "user_id,period_label" });
+    if (error) throw error;
+  }
+
   /* ---- client-admin board (view-only, scoped to one client) ------------- */
   // Returns each VA on the client with training volume, capabilities (from
   // completed modules), week hours + billable amount. NO pay_rate is fetched.
@@ -180,8 +204,7 @@
       const doneSet = new Set(await progressFor(va.id));
       const shifts = await weekShifts(va.id);
       const hours  = sumHours(shifts);
-      const { data: perf } = await sb.from("performance_metrics")
-        .select("label,value,period").eq("user_id", va.id);
+      const prod   = await productivityFor(va.id);
       out.push(Object.assign(
         vaProgress(mods, doneSet),
         {
@@ -189,7 +212,7 @@
           site: va.site || "Unassigned",
           hours: hours,
           billable: hours * Number(va.billable_rate || 0),
-          performance: perf || []
+          productivity: prod
         }
       ));
     }
@@ -230,12 +253,15 @@
     for (const va of vas) {
       if (!modsCache[va.vertical]) modsCache[va.vertical] = await modulesFor(va.vertical);
       const doneSet = new Set(await progressFor(va.id));
+      const prod = await productivityFor(va.id);
       out.push(Object.assign(
         vaProgress(modsCache[va.vertical], doneSet),
         {
           id: va.id, name: va.name, vertical: va.vertical,
           site: va.site || "Unassigned",
-          client: clientName[va.client_id] || "—"
+          client: clientName[va.client_id] || "—",
+          client_id: va.client_id,
+          productivity: prod
         }
       ));
     }
@@ -271,6 +297,7 @@
     modulesFor, moduleWithSections, progressFor, completeModule, quizFor,
     cheatsheetForSite, siteHasCheatsheet, revealCheatsheetNav,
     clientBoard, teamBoard, adminStats,
+    productivityFor, saveProductivity,
     // small helper: bail out gracefully if keys aren't set yet
     ready() {
       if (!window.ERICKA_CONFIGURED) {

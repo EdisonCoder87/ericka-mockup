@@ -138,6 +138,23 @@
       + label + '</span><span>' + done + ' / ' + total + '</span></div>'
       + '<div class="pbar' + (gold?' gold':'') + '"><span style="width:' + pct + '%"></span></div>';
   }
+  function prodBox(label, val) {
+    return '<div style="flex:1;background:var(--cream);border:1px solid var(--line);border-radius:12px;padding:12px 14px;text-align:center">'
+      + '<div style="font-family:var(--f-display);font-weight:600;font-size:22px">' + (val==null?'–':val) + '</div>'
+      + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grey);margin-top:2px">' + label + '</div></div>';
+  }
+  function prodBlock(va) {
+    const p = va.productivity;
+    return '<div style="margin-top:18px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">'
+      +   '<span style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--grey)">Productivity</span>'
+      +   (p && p.period_label ? '<span style="font-size:11px;color:var(--grey)">' + p.period_label + '</span>' : '')
+      + '</div>'
+      + (p
+          ? '<div style="display:flex;gap:10px">' + prodBox('Calls', p.calls) + prodBox('Bookings', p.bookings) + prodBox('Payments', p.payments) + '</div>'
+          : '<div style="font-size:13px;color:var(--grey)">Awaiting team-lead entry (from 3CX / HotDoc / Pracsoft).</div>')
+      + '</div>';
+  }
   function cardHtml(va) {
     const gold = va.vertical === 'medical';
     const vbadge = gold ? '<span class="chip chip-medical">🩺 Medical</span>'
@@ -167,11 +184,38 @@
       +       '<div style="font-family:var(--f-display);font-weight:600;font-size:24px;margin-top:2px;color:var(--gold-text)">$' + va.billable.toFixed(0) + '</div>'
       +     '</div>'
       +   '</div>'
+      +   prodBlock(va)
       +   '<div style="margin-top:16px;text-align:center;font-size:12px;font-weight:700;color:var(--violet)">Tap to see modules →</div>'
       + '</div>';
   }
 
-  el.innerHTML = sites.map(function (g) {
+  // At-a-glance scoreboard across all the client's VAs.
+  function scoreboardHtml(list) {
+    const rows = list.map(function (va) {
+      const tPct = va.modulesTotal ? Math.round(va.modulesDone/va.modulesTotal*100) : 0;
+      const p = va.productivity;
+      const onboarded = va.onbTotal && va.onbDone === va.onbTotal;
+      const status = onboarded ? '<span class="chip chip-ok">Ready</span>' : '<span class="chip chip-open">In training</span>';
+      return '<tr>'
+        + '<td><div class="who"><div class="avatar' + (va.vertical==='medical'?' gold':'') + '">' + initials(va.name) + '</div>' + va.name + '</div></td>'
+        + '<td>📍 ' + va.site + '</td>'
+        + '<td>' + va.modulesDone + '/' + va.modulesTotal + ' (' + tPct + '%)</td>'
+        + '<td>' + va.capabilities.length + '</td>'
+        + '<td style="text-align:right">' + (p ? p.calls : '—') + '</td>'
+        + '<td style="text-align:right">' + (p ? p.bookings : '—') + '</td>'
+        + '<td>' + status + '</td>'
+        + '</tr>';
+    }).join('');
+    return '<div class="section-h">Performance at a glance <span>your team this week</span></div>'
+      + '<div style="font-size:12px;color:var(--grey);margin:-6px 0 12px">Productivity (calls / bookings) is entered by the team lead from 3CX, HotDoc &amp; Pracsoft.</div>'
+      + '<div class="panel" style="overflow-x:auto"><table>'
+      + '<thead><tr><th>VA</th><th>Site</th><th>Training</th><th>Capabilities</th><th style="text-align:right">Calls</th><th style="text-align:right">Bookings</th><th>Status</th></tr></thead>'
+      + '<tbody>' + rows + '</tbody></table></div>';
+  }
+
+  el.innerHTML = scoreboardHtml(board)
+    + '<div class="section-h" style="margin-top:34px">Your team <span>by site</span></div>'
+    + sites.map(function (g) {
     return '<div class="site-head"><span class="pin">📍</span>' + g.name
          + '<span class="n">' + g.vas.length + ' VA' + (g.vas.length===1?'':'s') + '</span></div>'
          + '<div class="cards c2">' + g.vas.map(cardHtml).join('') + '</div>';
@@ -194,15 +238,18 @@
   function openModal(va) {
     const gold = va.vertical === 'medical';
     const rows = checklist(va.modules, 'onboarding', 'Onboarding') + checklist(va.modules, 'training', 'Training');
-    const perf = va.performance.length
-      ? va.performance.map(p => '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span style="color:var(--grey)">'+p.label+'</span><b>'+p.value+'</b></div>').join('')
-      : '<span style="font-size:13px;color:var(--grey)">No performance data yet — coming soon.</span>';
+    const p = va.productivity;
+    const prod = p
+      ? '<div style="display:flex;gap:10px;margin-top:4px">' + prodBox('Calls (3CX)', p.calls) + prodBox('Bookings', p.bookings) + prodBox('Payments', p.payments) + '</div>'
+        + '<div style="font-size:12px;color:var(--grey);margin-top:6px">' + (p.period_label || '')
+        + (p.updated_at ? ' · updated ' + new Date(p.updated_at).toLocaleDateString('en-AU') : '') + '</div>'
+      : '<span style="font-size:13px;color:var(--grey)">Awaiting team-lead entry (from 3CX / HotDoc / Pracsoft).</span>';
     document.getElementById('modal-body').innerHTML = ''
       + '<div class="who" style="margin-bottom:4px"><div class="avatar' + (gold?' gold':'') + '">' + initials(va.name) + '</div><b style="font-size:18px">' + va.name + '</b></div>'
       + '<div style="font-size:13px;color:var(--grey);margin-bottom:6px">' + (gold?'🩺 Medical':'🦷 Dental') + ' · 📍 ' + va.site + ' · ' + va.modulesDone + ' of ' + va.modulesTotal + ' modules complete</div>'
       + rows
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin:20px 0 6px">Performance</div>'
-      + perf;
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin:20px 0 6px">Productivity</div>'
+      + prod;
     document.getElementById('va-modal').style.display = 'flex';
   }
 

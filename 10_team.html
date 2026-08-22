@@ -151,14 +151,70 @@
             + '<div class="ms ' + (m.done?'done':'todo') + '">' + (m.done?'Done':'To do') + '</div></div>';
         }).join('');
   }
+  function weekLabel() {
+    const d = new Date(); d.setHours(0,0,0,0);
+    d.setDate(d.getDate() - ((d.getDay()+6)%7));   // Monday
+    return 'Week of ' + d.toLocaleDateString('en-AU', {day:'numeric', month:'short', year:'numeric'});
+  }
+  function numField(id, label, hint, val) {
+    return '<div style="flex:1;min-width:90px"><label style="font-size:11px;font-weight:700;color:var(--grey)">'
+      + label + '</label><input id="' + id + '" type="number" min="0" inputmode="numeric" value="' + (val==null?'':val)
+      + '" style="padding:9px 11px"><div style="font-size:10px;color:var(--grey);margin-top:2px">' + hint + '</div></div>';
+  }
+  function prodForm(va) {
+    const p = va.productivity || {};
+    return '<div style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px">'
+      + '<div class="mini" style="margin-bottom:8px">Productivity — enter from 3CX / HotDoc / Pracsoft</div>'
+      + '<label style="font-size:11px;font-weight:700;color:var(--grey)">Period</label>'
+      + '<input id="p-period" value="' + (p.period_label || weekLabel()) + '" style="padding:9px 11px;margin-bottom:10px">'
+      + '<div style="display:flex;gap:10px;flex-wrap:wrap">'
+      +   numField('p-calls','Calls','3CX', p.calls)
+      +   numField('p-bookings','Bookings','HotDoc/Pracsoft', p.bookings)
+      +   numField('p-payments','Payments','HotDoc', p.payments)
+      + '</div>'
+      + '<label style="font-size:11px;font-weight:700;color:var(--grey);margin-top:10px;display:block">Notes (optional)</label>'
+      + '<input id="p-notes" value="' + (p.notes ? String(p.notes).replace(/"/g,'&quot;') : '') + '" style="padding:9px 11px">'
+      + '<div style="display:flex;align-items:center;gap:12px;margin-top:12px">'
+      +   '<button id="p-save" class="btn btn-primary" style="padding:11px 24px">Save productivity</button>'
+      +   '<span id="p-msg" style="font-size:13px;color:var(--ok);font-weight:700"></span>'
+      + '</div>'
+      + (p.updated_at ? '<div style="font-size:11px;color:var(--grey);margin-top:8px">Last updated ' + new Date(p.updated_at).toLocaleString('en-AU') + '</div>' : '')
+      + '</div>';
+  }
   function openModal(va) {
     const gold = va.vertical === 'medical';
     document.getElementById('modal-body').innerHTML =
       '<div class="who" style="margin-bottom:4px"><div class="avatar' + (gold?' gold':'') + '">' + initials(va.name) + '</div><b style="font-size:18px">' + va.name + '</b></div>'
       + '<div style="font-size:13px;color:var(--grey);margin-bottom:6px">' + va.client + ' · 📍 ' + va.site + ' · ' + (gold?'Medical':'Dental') + '</div>'
       + checklist(va.modules, 'onboarding')
-      + checklist(va.modules, 'training');
+      + checklist(va.modules, 'training')
+      + prodForm(va);
     document.getElementById('va-modal').style.display = 'flex';
+
+    const save = document.getElementById('p-save');
+    save.onclick = async function () {
+      save.disabled = true; save.textContent = 'Saving…';
+      const num = id => parseInt(document.getElementById(id).value, 10) || 0;
+      try {
+        await ericka.saveProductivity({
+          userId: va.id, clientId: va.client_id,
+          period: document.getElementById('p-period').value.trim() || weekLabel(),
+          calls: num('p-calls'), bookings: num('p-bookings'), payments: num('p-payments'),
+          notes: document.getElementById('p-notes').value.trim(), by: s.id
+        });
+        // reflect locally so a re-open shows the new values
+        va.productivity = {
+          period_label: document.getElementById('p-period').value.trim(),
+          calls: num('p-calls'), bookings: num('p-bookings'), payments: num('p-payments'),
+          notes: document.getElementById('p-notes').value.trim(), updated_at: new Date().toISOString()
+        };
+        document.getElementById('p-msg').textContent = 'Saved ✓';
+      } catch (e) {
+        document.getElementById('p-msg').style.color = 'var(--danger)';
+        document.getElementById('p-msg').textContent = 'Failed: ' + (e.message || e);
+      }
+      save.disabled = false; save.textContent = 'Save productivity';
+    };
   }
   document.querySelectorAll('.va-card').forEach(function (c) {
     c.addEventListener('click', function () { openModal(byId[c.dataset.id]); });
