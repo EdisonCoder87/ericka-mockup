@@ -23,7 +23,7 @@
   <a href="05_va_home.html"><span class="ic">🏠</span> Home</a>
   <a href="06_va_training.html" class="active"><span class="ic">🎓</span> My Training</a>
   <a href="07_va_timesheet.html"><span class="ic">🕑</span> My Timesheet</a>
-  <a href="01_welcome.html" class="logout"><span class="ic">↩</span> Sign out</a>
+  <a href="01_welcome.html" class="logout" onclick="ericka.logout();return false;"><span class="ic">↩</span> Sign out</a>
 </nav>
 
 <div class="page">
@@ -31,10 +31,10 @@
     <div class="phead-inner">
       <div>
         <h1>My Training</h1>
-        <div class="sub">Your track is set by your role — you're on the <b>Medical</b> track.</div>
+        <div class="sub">Your track is set by your role — you're on the <b id="track-name">…</b> track.</div>
       </div>
       <!-- Gated: single locked track pill, NOT a toggle -->
-      <span class="chip chip-medical" style="padding:9px 18px;font-size:13px">🩺 Medical track · assigned to you</span>
+      <span class="chip chip-medical" id="track-pill" style="padding:9px 18px;font-size:13px">…</span>
     </div>
   </div>
 
@@ -42,24 +42,19 @@
 
     <div class="panel" style="padding:22px 24px;display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:26px">
       <div>
-        <div style="font-family:var(--f-display);font-weight:600;font-size:20px">Front-desk foundations for medical VAs</div>
-        <div style="font-size:13px;color:var(--grey);margin-top:4px">6 modules · learn → quiz → practice</div>
+        <div style="font-family:var(--f-display);font-weight:600;font-size:20px" id="track-title">Front-desk foundations</div>
+        <div style="font-size:13px;color:var(--grey);margin-top:4px" id="track-count">learn → quiz → practice</div>
       </div>
       <div style="min-width:180px">
         <div style="font-size:12px;color:var(--grey);font-weight:600">Your progress</div>
-        <div class="pbar gold"><span style="width:67%"></span></div>
-        <div style="font-size:12px;color:var(--grey);margin-top:6px">4 of 6 complete</div>
+        <div class="pbar gold"><span id="prog-bar" style="width:0%"></span></div>
+        <div style="font-size:12px;color:var(--grey);margin-top:6px" id="prog-text">0 of 0 complete</div>
       </div>
     </div>
 
     <div class="section-h">Modules <span>work through them in order</span></div>
-    <div class="cards c3">
-      <a href="#" class="ac"><span class="tag tag-medical" style="background:#e4f4ec;color:var(--ok)">✓ Done</span><span class="ic">👋</span><div class="t">Welcome &amp; the Ericka Way</div><div class="d">Who we are and what great clinic support looks like.</div><span class="cta">Review →</span></a>
-      <a href="#" class="ac"><span class="tag tag-medical" style="background:#e4f4ec;color:var(--ok)">✓ Done</span><span class="ic">📞</span><div class="t">Medical Front-Desk Calls</div><div class="d">Triage-aware phone handling and appointment types.</div><span class="cta">Review →</span></a>
-      <a href="#" class="ac"><span class="tag tag-medical" style="background:#e4f4ec;color:var(--ok)">✓ Done</span><span class="ic">💻</span><div class="t">Practice Software</div><div class="d">Booking, recalls and records in the clinic system.</div><span class="cta">Review →</span></a>
-      <a href="#" class="ac"><span class="tag tag-medical" style="background:#e4f4ec;color:var(--ok)">✓ Done</span><span class="ic">🩺</span><div class="t">Medicare &amp; Bulk Billing</div><div class="d">Item numbers, bulk billing vs private, DVA basics.</div><span class="cta">Review →</span></a>
-      <a href="#" class="ac" style="border-color:var(--gold);box-shadow:0 8px 26px rgba(193,149,63,.18)"><span class="tag tag-medical">▶ Next up</span><span class="ic">📋</span><div class="t">Results &amp; Recalls</div><div class="d">Results workflow, recall lists and clinician instructions.</div><span class="cta">Start module →</span></a>
-      <div class="ac" style="opacity:.55;cursor:not-allowed"><span class="tag" style="background:var(--line);color:var(--grey)">🔒 Locked</span><span class="ic">🔒</span><div class="t">Privacy &amp; Compliance</div><div class="d">Unlocks when you finish Module 5.</div><span class="cta" style="color:var(--grey)">Locked</span></div>
+    <div class="cards c3" id="mod-cards">
+      <div class="panel" style="padding:24px;color:var(--grey)">Loading your modules…</div>
     </div>
 
     <!-- Future third track — visual placeholder -->
@@ -76,5 +71,65 @@
 
   </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+(async function () {
+  if (!ericka.ready()) return;
+  const s = ericka.requireRole(['va']);
+  if (!s) return;
+
+  const isDental = s.vertical === 'dental';
+  const label = isDental ? 'Dental' : 'Medical';
+  document.getElementById('track-name').textContent = label;
+  const pill = document.getElementById('track-pill');
+  pill.textContent = (isDental ? '🦷 ' : '🩺 ') + label + ' track · assigned to you';
+  pill.className = 'chip ' + (isDental ? 'chip-dental' : 'chip-medical');
+  pill.style.padding = '9px 18px'; pill.style.fontSize = '13px';
+  document.getElementById('track-title').textContent = 'Front-desk foundations for ' + label.toLowerCase() + ' VAs';
+
+  const tagClass = isDental ? 'tag-dental' : 'tag-medical';
+  const mods = await ericka.modulesFor(s.vertical);
+
+  async function render() {
+    const done = await ericka.progressFor(s.id);
+    const doneSet = new Set(done);
+    const doneCount = mods.filter(m => doneSet.has(m.id)).length;
+    document.getElementById('track-count').textContent = mods.length + ' modules · learn → quiz → practice';
+    document.getElementById('prog-bar').style.width = (mods.length ? Math.round(doneCount/mods.length*100) : 0) + '%';
+    document.getElementById('prog-text').textContent = doneCount + ' of ' + mods.length + ' complete';
+
+    const nextIdx = mods.findIndex(m => !doneSet.has(m.id));
+    const wrap = document.getElementById('mod-cards');
+    wrap.innerHTML = mods.map(function (m, i) {
+      if (doneSet.has(m.id)) {
+        return '<div class="ac"><span class="tag ' + tagClass + '" style="background:#e4f4ec;color:var(--ok)">✓ Done</span>'
+          + '<span class="ic">' + (m.icon||'📘') + '</span><div class="t">' + m.title + '</div>'
+          + '<div class="d">Capability: ' + m.capability_label + '</div><span class="cta">Review →</span></div>';
+      }
+      if (i === nextIdx) {
+        return '<div class="ac mod-next" data-id="' + m.id + '" style="border-color:var(--gold);box-shadow:0 8px 26px rgba(193,149,63,.18);cursor:pointer">'
+          + '<span class="tag ' + tagClass + '">▶ Next up</span><span class="ic">' + (m.icon||'📘') + '</span>'
+          + '<div class="t">Module ' + m.ord + ' · ' + m.title + '</div>'
+          + '<div class="d">Earns: ' + m.capability_label + '. Tap to mark complete.</div>'
+          + '<span class="cta">Complete module →</span></div>';
+      }
+      return '<div class="ac" style="opacity:.55;cursor:not-allowed"><span class="tag" style="background:var(--line);color:var(--grey)">🔒 Locked</span>'
+        + '<span class="ic">🔒</span><div class="t">' + m.title + '</div>'
+        + '<div class="d">Unlocks when you finish the module before it.</div><span class="cta" style="color:var(--grey)">Locked</span></div>';
+    }).join('');
+
+    const nextCard = wrap.querySelector('.mod-next');
+    if (nextCard) nextCard.addEventListener('click', async function () {
+      nextCard.style.pointerEvents = 'none';
+      await ericka.completeModule(s.id, nextCard.dataset.id);
+      render();
+    });
+  }
+  render();
+})();
+</script>
 </body>
 </html>

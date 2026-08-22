@@ -18,35 +18,66 @@
     <h2>Welcome to the team portal</h2>
     <p class="lead">Your home for training, timesheets and everything you need to do great work for our clients. Sign in to get started.</p>
 
-    <form>
+    <form id="login-form">
       <div class="field">
         <label for="name">Your name</label>
         <select id="name">
-          <option>— Select your name —</option>
-          <option selected>Edison Nguyen (Admin)</option>
-          <option>Ericka Dela Cruz</option>
-          <option>Angelica Reyes</option>
-          <option>Marco Santos</option>
-          <option>Bea Villanueva</option>
+          <option value="">— Select your name —</option>
         </select>
       </div>
       <div class="field">
         <label for="pin">PIN</label>
-        <input id="pin" type="password" placeholder="4-digit PIN" value="••••">
+        <input id="pin" type="password" inputmode="numeric" placeholder="4-digit PIN" autocomplete="off">
       </div>
-      <a href="02_home.html" class="btn btn-primary" style="width:100%;justify-content:center;padding:15px">Sign in →</a>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:15px">Sign in →</button>
+      <div id="login-error" style="display:none;margin-top:12px;font-size:13px;color:var(--danger);font-weight:600"></div>
     </form>
 
     <div class="login-foot">Human-led, AI-harnessed. Powered by <b>malasakit</b> — genuine care.</div>
-
-    <div style="margin-top:20px;padding-top:16px;border-top:1px dashed var(--line)">
-      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--grey);margin-bottom:10px">Mockup preview — jump to a view</div>
-      <div style="display:flex;gap:8px">
-        <a href="02_home.html" class="btn btn-ghost" style="flex:1;justify-content:center;font-size:13px;padding:11px">👔 Manager view</a>
-        <a href="05_va_home.html" class="btn btn-ghost" style="flex:1;justify-content:center;font-size:13px;padding:11px">🩺 Medical VA view</a>
-      </div>
-    </div>
   </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+(async function () {
+  if (!ericka.ready()) return;
+  // already signed in? go straight to their home
+  const existing = ericka.session();
+  if (existing) { location.href = ericka.homeFor(existing.role); return; }
+
+  // populate the name dropdown from the users table
+  const sel = document.getElementById('name');
+  const { data: users, error } = await sb.from('users')
+    .select('name,role').eq('active', true).order('role').order('name');
+  if (!error && users) {
+    const labelRole = { admin: 'Admin', client_admin: 'Client', va: 'VA' };
+    users.forEach(function (u) {
+      const o = document.createElement('option');
+      o.value = u.name;
+      o.textContent = u.name + '  ·  ' + (labelRole[u.role] || u.role);
+      sel.appendChild(o);
+    });
+  }
+
+  const err = document.getElementById('login-error');
+  document.getElementById('login-form').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    err.style.display = 'none';
+    const name = sel.value;
+    const pin  = document.getElementById('pin').value.trim();
+    if (!name) { err.textContent = 'Please select your name.'; err.style.display = 'block'; return; }
+    try {
+      const user = await ericka.login(name, pin);
+      if (!user) { err.textContent = 'Wrong PIN — please try again.'; err.style.display = 'block'; return; }
+      location.href = ericka.homeFor(user.role);
+    } catch (ex) {
+      err.textContent = 'Could not sign in. ' + (ex.message || ex);
+      err.style.display = 'block';
+    }
+  });
+})();
+</script>
 </body>
 </html>

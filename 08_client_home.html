@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Team — Ericka Client Portal</title>
+<link rel="stylesheet" href="ericka.css">
+</head>
+<body>
+
+<input type="checkbox" id="navtog">
+<div class="app-topbar">
+  <label class="burger" for="navtog"><span></span><span></span><span></span></label>
+  <div class="wm rev">Erick<span class="a">a</span></div>
+</div>
+
+<!-- Client Admin sidebar — view only: Home / My VAs -->
+<nav class="app-sidebar">
+  <div class="sidebar-brand">
+    <div class="wm rev">Erick<span class="a">a</span></div>
+    <svg class="pulse" viewBox="0 0 90 14" preserveAspectRatio="none"><path d="M2 7 H32 l4 -5 l5 10 l4 -8 l3 3 H88"/></svg>
+  </div>
+  <div class="nav-group-label">Your team</div>
+  <a href="08_client_home.html" class="active"><span class="ic">🏠</span> Home</a>
+  <a href="#board"><span class="ic">👥</span> My VAs</a>
+  <a href="01_welcome.html" class="logout" onclick="ericka.logout();return false;"><span class="ic">↩</span> Sign out</a>
+</nav>
+
+<div class="page">
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-inner">
+      <div class="hero-left">
+        <div class="hero-label">Welcome back</div>
+        <h1 class="hero-name" id="hero-name">Hi 👋</h1>
+        <p class="hero-tagline">Here's your Ericka team — their training, capabilities and hours this week. Everything in one place.</p>
+        <span class="badge-pill" id="client-badge" style="border-color:var(--lilt);color:#fff;background:rgba(255,255,255,.12)">
+          <span class="dot"></span> <span id="client-name">Your clinic</span>
+        </span>
+      </div>
+      <div class="hero-right">
+        <div class="stat"><div class="v" id="s-vas">–</div><div class="l">Your VAs</div></div>
+        <div class="stat"><div class="v" id="s-hrs">–</div><div class="l">Hrs this wk</div></div>
+        <div class="stat"><div class="v" id="s-train">–</div><div class="l">Training done</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="section-h" id="board">Your team <span>capabilities · training · hours</span></div>
+    <div id="board-cards" class="cards c2">
+      <div class="panel" style="padding:26px;color:var(--grey)">Loading your team…</div>
+    </div>
+
+    <div class="quote">
+      <div class="qm">"</div>
+      <div>
+        <div class="qb">Our people don't just fill a seat — they carry <i>malasakit</i> into every clinic they support.</div>
+        <div class="qa">— The Ericka Way</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+(async function () {
+  if (!ericka.ready()) return;
+  const s = ericka.requireRole(['client_admin']);
+  if (!s) return;
+
+  // greeting + client name
+  const first = (s.name || '').replace(/\s*\(.*\)$/, '').split(' ')[0];
+  document.getElementById('hero-name').textContent = 'Hi ' + first + ' 👋';
+  const { data: client } = await sb.from('clients').select('name,vertical').eq('id', s.client_id).maybeSingle();
+  if (client) document.getElementById('client-name').textContent = client.name;
+
+  const initials = n => n.replace(/\s*\(.*\)$/, '').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+  const board = await ericka.clientBoard(s.client_id);
+
+  // hero stats
+  const totalHrs = board.reduce((t,v) => t + v.hours, 0);
+  const dDone = board.reduce((t,v) => t + v.modulesDone, 0);
+  const dTot  = board.reduce((t,v) => t + v.modulesTotal, 0);
+  document.getElementById('s-vas').textContent   = board.length;
+  document.getElementById('s-hrs').textContent   = totalHrs.toFixed(1);
+  document.getElementById('s-train').textContent = dTot ? Math.round(dDone/dTot*100) + '%' : '0%';
+
+  const el = document.getElementById('board-cards');
+  if (!board.length) {
+    el.innerHTML = '<div class="panel" style="padding:26px;color:var(--grey)">No VAs assigned to your team yet.</div>';
+    return;
+  }
+
+  el.innerHTML = board.map(function (va) {
+    const pct  = va.modulesTotal ? Math.round(va.modulesDone/va.modulesTotal*100) : 0;
+    const gold = va.vertical === 'medical';
+    const vbadge = gold ? '<span class="chip chip-medical">🩺 Medical</span>'
+                        : '<span class="chip chip-dental">🦷 Dental</span>';
+    const caps = va.capabilities.length
+      ? va.capabilities.map(c => '<span class="chip chip-ok" style="margin:0 6px 6px 0">✓ ' + c + '</span>').join('')
+      : '<span style="font-size:13px;color:var(--grey)">No capabilities earned yet.</span>';
+    const perf = va.performance.length
+      ? va.performance.map(p => '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span style="color:var(--grey)">'+p.label+'</span><b>'+p.value+'</b></div>').join('')
+      : '<span style="font-size:13px;color:var(--grey)">No performance data yet — coming soon.</span>';
+
+    return ''
+      + '<div class="panel" style="padding:24px">'
+      +   '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">'
+      +     '<div class="who"><div class="avatar' + (gold?' gold':'') + '">' + initials(va.name) + '</div><b style="font-size:16px">' + va.name + '</b></div>'
+      +     vbadge
+      +   '</div>'
+      +   '<div style="margin-top:18px">'
+      +     '<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:var(--grey)"><span>Training</span><span>' + va.modulesDone + ' / ' + va.modulesTotal + ' modules</span></div>'
+      +     '<div class="pbar' + (gold?' gold':'') + '"><span style="width:' + pct + '%"></span></div>'
+      +   '</div>'
+      +   '<div style="margin-top:18px">'
+      +     '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin-bottom:8px">Capabilities</div>'
+      +     '<div>' + caps + '</div>'
+      +   '</div>'
+      +   '<div style="margin-top:18px;display:flex;gap:12px">'
+      +     '<div style="flex:1;background:var(--cream);border:1px solid var(--line);border-radius:12px;padding:14px 16px">'
+      +       '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--grey)">Hours this wk</div>'
+      +       '<div style="font-family:var(--f-display);font-weight:600;font-size:24px;margin-top:2px">' + va.hours.toFixed(1) + '</div>'
+      +     '</div>'
+      +     '<div style="flex:1;background:var(--cream);border:1px solid var(--line);border-radius:12px;padding:14px 16px">'
+      +       '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--grey)">Billable</div>'
+      +       '<div style="font-family:var(--f-display);font-weight:600;font-size:24px;margin-top:2px;color:var(--gold-text)">$' + va.billable.toFixed(0) + '</div>'
+      +     '</div>'
+      +   '</div>'
+      +   '<div style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px">'
+      +     '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin-bottom:8px">Performance</div>'
+      +     perf
+      +   '</div>'
+      + '</div>';
+  }).join('');
+})();
+</script>
+</body>
+</html>

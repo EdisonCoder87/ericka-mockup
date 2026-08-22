@@ -24,7 +24,7 @@
   <a href="05_va_home.html" class="active"><span class="ic">🏠</span> Home</a>
   <a href="06_va_training.html"><span class="ic">🎓</span> My Training</a>
   <a href="07_va_timesheet.html"><span class="ic">🕑</span> My Timesheet</a>
-  <a href="01_welcome.html" class="logout"><span class="ic">↩</span> Sign out</a>
+  <a href="01_welcome.html" class="logout" onclick="ericka.logout();return false;"><span class="ic">↩</span> Sign out</a>
 </nav>
 
 <div class="page">
@@ -33,47 +33,45 @@
     <div class="hero-inner">
       <div class="hero-left">
         <div class="hero-label">Welcome back</div>
-        <h1 class="hero-name">Hi Bea 👋</h1>
-        <p class="hero-tagline">Thanks for the care you bring to SIA Medical every day. Here's where you're up to.</p>
+        <h1 class="hero-name" id="hero-name">Hi 👋</h1>
+        <p class="hero-tagline" id="hero-tag">Here's where you're up to.</p>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <span class="badge-pill" style="border-color:var(--gold);color:#fff;background:rgba(193,149,63,.22)">
-            <span class="dot" style="background:var(--gold)"></span> Medical VA
+          <span class="badge-pill" id="badge-vertical" style="border-color:var(--gold);color:#fff;background:rgba(193,149,63,.22)">
+            <span class="dot" style="background:var(--gold)"></span> <span id="badge-vertical-t">VA</span>
           </span>
-          <span class="badge-pill" style="border-color:var(--lilt);color:#fff;background:rgba(255,255,255,.1)">
-            <span class="dot"></span> SIA Medical
+          <span class="badge-pill" id="badge-client" style="border-color:var(--lilt);color:#fff;background:rgba(255,255,255,.1)">
+            <span class="dot"></span> <span id="badge-client-t">—</span>
           </span>
         </div>
       </div>
       <div class="hero-right">
-        <div class="stat"><div class="v">4/6</div><div class="l">Modules</div></div>
-        <div class="stat"><div class="v">40.0</div><div class="l">Hrs this wk</div></div>
-        <div class="stat"><div class="v">🔥7</div><div class="l">Day streak</div></div>
+        <div class="stat"><div class="v" id="s-mods">–</div><div class="l">Modules</div></div>
+        <div class="stat"><div class="v" id="s-hrs">–</div><div class="l">Hrs this wk</div></div>
+        <div class="stat"><div class="v" id="s-status">–</div><div class="l">Today</div></div>
       </div>
     </div>
   </div>
 
   <div class="wrap">
 
-    <!-- Clock-in strip -->
-    <a href="07_va_timesheet.html" style="text-decoration:none;display:block">
-      <div class="panel" style="padding:22px 24px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;background:linear-gradient(135deg,var(--violet-d),var(--violet));border:none;color:#fff">
-        <div>
-          <div style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--lilt)">🕑 Today</div>
-          <div style="font-family:var(--f-display);font-weight:600;font-size:22px;margin-top:5px">You're clocked in since 9:02am</div>
-          <div style="font-size:13px;color:rgba(255,255,255,.8);margin-top:2px">Don't forget to clock out at the end of your shift.</div>
-        </div>
-        <span class="btn" style="background:#fff;color:var(--violet-d)">Clock out →</span>
+    <!-- Clock-in strip (live) -->
+    <div class="panel" id="clock-strip" style="padding:22px 24px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;background:linear-gradient(135deg,var(--violet-d),var(--violet));border:none;color:#fff">
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--lilt)">🕑 Today</div>
+        <div id="clock-headline" style="font-family:var(--f-display);font-weight:600;font-size:22px;margin-top:5px">Loading…</div>
+        <div id="clock-sub" style="font-size:13px;color:rgba(255,255,255,.8);margin-top:2px"></div>
       </div>
-    </a>
+      <button class="btn" id="clock-btn" style="background:#fff;color:var(--violet-d)" disabled>…</button>
+    </div>
 
-    <div class="section-h">Keep going <span>your medical track</span></div>
+    <div class="section-h">Keep going <span>your training track</span></div>
     <div class="cards c2">
       <a href="06_va_training.html" class="ac">
         <span class="tag tag-medical">Next up</span>
         <span class="ic">📋</span>
-        <div class="t">Module 5 · Results &amp; Recalls</div>
-        <div class="d">You're 4 of 6 modules through the medical track. Pick up where you left off.</div>
-        <div class="pbar gold"><span style="width:67%"></span></div>
+        <div class="t" id="next-mod">Your training</div>
+        <div class="d" id="next-mod-d">Pick up where you left off.</div>
+        <div class="pbar gold"><span id="train-bar" style="width:0%"></span></div>
         <span class="cta">Continue training →</span>
       </a>
       <a href="07_va_timesheet.html" class="ac">
@@ -93,5 +91,74 @@
     </div>
   </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+(async function () {
+  if (!ericka.ready()) return;
+  const s = ericka.requireRole(['va']);
+  if (!s) return;
+
+  const first = (s.name || '').split(' ')[0];
+  document.getElementById('hero-name').textContent = 'Hi ' + first + ' 👋';
+  document.getElementById('badge-vertical-t').textContent = (s.vertical === 'dental' ? 'Dental VA' : 'Medical VA');
+
+  const { data: client } = await sb.from('clients').select('name').eq('id', s.client_id).maybeSingle();
+  if (client) {
+    document.getElementById('badge-client-t').textContent = client.name;
+    document.getElementById('hero-tag').textContent = 'Thanks for the care you bring to ' + client.name + ' every day.';
+  }
+
+  // training progress
+  const mods = await ericka.modulesFor(s.vertical);
+  const done = await ericka.progressFor(s.id);
+  const doneCount = mods.filter(m => done.indexOf(m.id) !== -1).length;
+  document.getElementById('s-mods').textContent = doneCount + '/' + mods.length;
+  document.getElementById('train-bar').style.width = (mods.length ? Math.round(doneCount/mods.length*100) : 0) + '%';
+  const next = mods.find(m => done.indexOf(m.id) === -1);
+  if (next) {
+    document.getElementById('next-mod').textContent = 'Module ' + next.ord + ' · ' + next.title;
+    document.getElementById('next-mod-d').textContent = "You're " + doneCount + ' of ' + mods.length + ' modules through your track.';
+  } else {
+    document.getElementById('next-mod').textContent = 'All modules complete 🎉';
+    document.getElementById('next-mod-d').textContent = 'Nice work — you\'ve finished your track.';
+  }
+
+  // hours this week
+  const shifts = await ericka.weekShifts(s.id);
+  document.getElementById('s-hrs').textContent = ericka.sumHours(shifts).toFixed(1);
+
+  // clock in/out state
+  const headline = document.getElementById('clock-headline');
+  const sub = document.getElementById('clock-sub');
+  const btn = document.getElementById('clock-btn');
+  const statusStat = document.getElementById('s-status');
+
+  async function renderClock() {
+    const open = await ericka.openShift(s.id);
+    if (open) {
+      const t = new Date(open.clock_in).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+      headline.textContent = "You're clocked in since " + t;
+      sub.textContent = "Don't forget to clock out at the end of your shift.";
+      btn.textContent = 'Clock out →';
+      statusStat.textContent = '🟢';
+      btn.onclick = async function () { btn.disabled = true; await ericka.clockOut(open.id); renderClock(); refreshHrs(); };
+    } else {
+      headline.textContent = "You're not clocked in";
+      sub.textContent = "Ready to start your shift?";
+      btn.textContent = 'Clock in →';
+      statusStat.textContent = '⚪';
+      btn.onclick = async function () { btn.disabled = true; await ericka.clockIn(s.id, s.client_id); renderClock(); };
+    }
+    btn.disabled = false;
+  }
+  async function refreshHrs() {
+    document.getElementById('s-hrs').textContent = ericka.sumHours(await ericka.weekShifts(s.id)).toFixed(1);
+  }
+  renderClock();
+})();
+</script>
 </body>
 </html>

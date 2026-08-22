@@ -29,7 +29,7 @@
   <a href="#"><span class="ic">👥</span> Team</a>
   <a href="#"><span class="ic">📊</span> Reports</a>
   <a href="#"><span class="ic">⚙️</span> Admin</a>
-  <a href="01_welcome.html" class="logout"><span class="ic">↩</span> Sign out</a>
+  <a href="01_welcome.html" class="logout" onclick="ericka.logout();return false;"><span class="ic">↩</span> Sign out</a>
 </nav>
 
 <div class="page">
@@ -38,16 +38,16 @@
     <div class="hero-inner">
       <div class="hero-left">
         <div class="hero-label">Welcome back</div>
-        <h1 class="hero-name">Hi Edison 👋</h1>
+        <h1 class="hero-name" id="hero-name">Hi 👋</h1>
         <p class="hero-tagline">Here's your team at a glance. Jump into training or check this week's hours.</p>
         <span class="badge-pill role-admin" style="border-color:var(--lilt);color:#fff;background:rgba(255,255,255,.12)">
           <span class="dot"></span> Admin
         </span>
       </div>
       <div class="hero-right">
-        <div class="stat"><div class="v">14</div><div class="l">Active VAs</div></div>
-        <div class="stat"><div class="v">486</div><div class="l">Hrs this wk</div></div>
-        <div class="stat"><div class="v">78%</div><div class="l">Training done</div></div>
+        <div class="stat"><div class="v" id="s-vas">–</div><div class="l">Active VAs</div></div>
+        <div class="stat"><div class="v" id="s-hrs">–</div><div class="l">Hrs this wk</div></div>
+        <div class="stat"><div class="v" id="s-train">–</div><div class="l">Training done</div></div>
       </div>
     </div>
   </div>
@@ -113,5 +113,21 @@
     </div>
   </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+(async function () {
+  if (!ericka.ready()) return;
+  const s = ericka.requireRole(['admin']);
+  if (!s) return;
+  document.getElementById('hero-name').textContent = 'Hi ' + (s.name || '').split(' ')[0] + ' 👋';
+  const st = await ericka.adminStats();
+  document.getElementById('s-vas').textContent   = st.activeVAs;
+  document.getElementById('s-hrs').textContent   = st.weekHours.toFixed(0);
+  document.getElementById('s-train').textContent = st.trainingPct + '%';
+})();
+</script>
 </body>
 </html>
