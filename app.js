@@ -18,6 +18,7 @@
   // Home page for each role
   function homeFor(role) {
     if (role === "admin")        return "02_home.html";
+    if (role === "team_lead")    return "10_team.html";
     if (role === "client_admin") return "08_client_home.html";
     return "05_va_home.html"; // va
   }
@@ -93,10 +94,48 @@
 
   /* ---- training --------------------------------------------------------- */
   async function modulesFor(vertical) {
+    // onboarding first (category sorts before 'training'), then by ord
     const { data, error } = await sb.from("training_modules")
-      .select("*").eq("vertical", vertical).order("ord", { ascending: true });
+      .select("*").eq("vertical", vertical)
+      .order("category", { ascending: true }).order("ord", { ascending: true });
     if (error) throw error;
     return data || [];
+  }
+  // A single module plus its ordered content sections (for the viewer).
+  async function moduleWithSections(moduleId) {
+    const { data: mod, error: e1 } = await sb.from("training_modules")
+      .select("*").eq("id", moduleId).maybeSingle();
+    if (e1) throw e1;
+    if (!mod) return null;
+    const { data: secs, error: e2 } = await sb.from("module_sections")
+      .select("ord,heading,body").eq("module_id", moduleId).order("ord");
+    if (e2) throw e2;
+    mod.sections = secs || [];
+    return mod;
+  }
+  // Cheat sheet sections for a site (e.g. Footscray).
+  async function cheatsheetForSite(site) {
+    const { data, error } = await sb.from("cheatsheets")
+      .select("ord,heading,body").eq("site", site).order("ord");
+    if (error) throw error;
+    return data || [];
+  }
+  // Does this site have a cheat sheet at all? (drives the sidebar link)
+  async function siteHasCheatsheet(site) {
+    if (!site) return false;
+    const { count } = await sb.from("cheatsheets")
+      .select("id", { count: "exact", head: true }).eq("site", site);
+    return (count || 0) > 0;
+  }
+  // Reveal a hidden #nav-cheat sidebar link for a VA whose site has a sheet.
+  async function revealCheatsheetNav(s) {
+    const el = document.getElementById("nav-cheat");
+    if (!el || !s || s.role !== "va") return;
+    if (await siteHasCheatsheet(s.site)) {
+      el.style.display = "";
+      const label = el.querySelector(".cs-site");
+      if (label) label.textContent = s.site + " Cheat Sheet";
+    }
   }
   async function progressFor(userId) {
     const { data, error } = await sb.from("training_progress")
@@ -129,24 +168,67 @@
     const out = [];
     for (const va of vas) {
       const mods  = modsByVertical[va.vertical] || [];
-      const doneIds = await progressFor(va.id);
-      const doneSet = new Set(doneIds);
-      const doneMods = mods.filter(m => doneSet.has(m.id));
+      const doneSet = new Set(await progressFor(va.id));
       const shifts = await weekShifts(va.id);
       const hours  = sumHours(shifts);
       const { data: perf } = await sb.from("performance_metrics")
         .select("label,value,period").eq("user_id", va.id);
-      out.push({
-        id: va.id, name: va.name, vertical: va.vertical,
-        site: va.site || "Unassigned",
-        modulesDone: doneMods.length, modulesTotal: mods.length,
-        capabilities: doneMods.map(m => m.capability_label),
-        // full ordered list for the drill-down (title + done flag, no deeper detail)
-        modules: mods.map(m => ({ ord: m.ord, title: m.title, icon: m.icon, done: doneSet.has(m.id) })),
-        hours: hours,
-        billable: hours * Number(va.billable_rate || 0),
-        performance: perf || []
-      });
+      out.push(Object.assign(
+        vaProgress(mods, doneSet),
+        {
+          id: va.id, name: va.name, vertical: va.vertical,
+          site: va.site || "Unassigned",
+          hours: hours,
+          billable: hours * Number(va.billable_rate || 0),
+          performance: perf || []
+        }
+      ));
+    }
+    return out;
+  }
+
+  // Shared progress summary for a VA (used by client + team boards).
+  // Splits onboarding vs training and returns the full module checklist.
+  function vaProgress(mods, doneSet) {
+    const onb = mods.filter(m => m.category === "onboarding");
+    const trn = mods.filter(m => m.category === "training");
+    const doneMods = mods.filter(m => doneSet.has(m.id));
+    return {
+      modulesDone: doneMods.length, modulesTotal: mods.length,
+      onbDone: onb.filter(m => doneSet.has(m.id)).length, onbTotal: onb.length,
+      trnDone: trn.filter(m => doneSet.has(m.id)).length, trnTotal: trn.length,
+      capabilities: doneMods.map(m => m.capability_label),
+      modules: mods.map(m => ({
+        ord: m.ord, title: m.title, icon: m.icon,
+        category: m.category, done: doneSet.has(m.id)
+      }))
+    };
+  }
+
+  // Whole-team board for admin / team_lead: every active VA across all
+  // clients, with client + site + onboarding/training progress + drill-down.
+  async function teamBoard() {
+    const { data: vas, error } = await sb.from("users")
+      .select("id,name,vertical,site,client_id")
+      .eq("role", "va").eq("active", true).order("name");
+    if (error) throw error;
+    if (!vas || !vas.length) return [];
+    const { data: clients } = await sb.from("clients").select("id,name");
+    const clientName = {};
+    (clients || []).forEach(c => { clientName[c.id] = c.name; });
+    const modsCache = {};
+    const out = [];
+    for (const va of vas) {
+      if (!modsCache[va.vertical]) modsCache[va.vertical] = await modulesFor(va.vertical);
+      const doneSet = new Set(await progressFor(va.id));
+      out.push(Object.assign(
+        vaProgress(modsCache[va.vertical], doneSet),
+        {
+          id: va.id, name: va.name, vertical: va.vertical,
+          site: va.site || "Unassigned",
+          client: clientName[va.client_id] || "—"
+        }
+      ));
     }
     return out;
   }
@@ -177,8 +259,9 @@
     session, setSession, logout, requireRole, homeFor, login,
     weekStart, hoursBetween,
     openShift, clockIn, clockOut, weekShifts, sumHours,
-    modulesFor, progressFor, completeModule,
-    clientBoard, adminStats,
+    modulesFor, moduleWithSections, progressFor, completeModule,
+    cheatsheetForSite, siteHasCheatsheet, revealCheatsheetNav,
+    clientBoard, teamBoard, adminStats,
     // small helper: bail out gracefully if keys aren't set yet
     ready() {
       if (!window.ERICKA_CONFIGURED) {

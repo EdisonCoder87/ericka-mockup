@@ -23,6 +23,7 @@
   <a href="05_va_home.html"><span class="ic">🏠</span> Home</a>
   <a href="06_va_training.html" class="active"><span class="ic">🎓</span> My Training</a>
   <a href="07_va_timesheet.html"><span class="ic">🕑</span> My Timesheet</a>
+  <a id="nav-cheat" href="cheatsheet.html" style="display:none"><span class="ic">📇</span> <span class="cs-site">Cheat Sheet</span></a>
   <a href="01_welcome.html" class="logout" onclick="ericka.logout();return false;"><span class="ic">↩</span> Sign out</a>
 </nav>
 
@@ -42,8 +43,8 @@
 
     <div class="panel" style="padding:22px 24px;display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:26px">
       <div>
-        <div style="font-family:var(--f-display);font-weight:600;font-size:20px" id="track-title">Front-desk foundations</div>
-        <div style="font-size:13px;color:var(--grey);margin-top:4px" id="track-count">learn → quiz → practice</div>
+        <div style="font-family:var(--f-display);font-weight:600;font-size:20px" id="track-title">Your learning path</div>
+        <div style="font-size:13px;color:var(--grey);margin-top:4px" id="track-count">onboarding first, then training</div>
       </div>
       <div style="min-width:180px">
         <div style="font-size:12px;color:var(--grey);font-weight:600">Your progress</div>
@@ -52,21 +53,14 @@
       </div>
     </div>
 
-    <div class="section-h">Modules <span>work through them in order</span></div>
-    <div class="cards c3" id="mod-cards">
-      <div class="panel" style="padding:24px;color:var(--grey)">Loading your modules…</div>
+    <div class="section-h">🎓 Onboarding <span>start here</span></div>
+    <div class="cards c3" id="onb-cards">
+      <div class="panel" style="padding:24px;color:var(--grey)">Loading…</div>
     </div>
 
-    <!-- Future third track — visual placeholder -->
-    <div class="section-h">Coming soon <span>for every ericka va</span></div>
-    <div class="cards c2">
-      <div class="ac" style="opacity:.7;cursor:default;border-style:dashed">
-        <span class="tag" style="background:var(--mist);color:var(--violet-d)">General VA</span>
-        <span class="ic">🌱</span>
-        <div class="t">General VA Skills <span style="font-size:12px;color:var(--grey);font-weight:600">· coming soon</span></div>
-        <div class="d">Cross-vertical basics every Ericka VA will complete — communication, tools, time management and the Ericka standard — regardless of dental or medical.</div>
-        <span class="cta" style="color:var(--grey)">Not yet available</span>
-      </div>
+    <div class="section-h">📚 Training modules <span>complete all to finish onboarding</span></div>
+    <div class="cards c3" id="trn-cards">
+      <div class="panel" style="padding:24px;color:var(--grey)">Loading…</div>
     </div>
 
   </div>
@@ -80,6 +74,7 @@
   if (!ericka.ready()) return;
   const s = ericka.requireRole(['va']);
   if (!s) return;
+  ericka.revealCheatsheetNav(s);
 
   const isDental = s.vertical === 'dental';
   const label = isDental ? 'Dental' : 'Medical';
@@ -88,47 +83,43 @@
   pill.textContent = (isDental ? '🦷 ' : '🩺 ') + label + ' track · assigned to you';
   pill.className = 'chip ' + (isDental ? 'chip-dental' : 'chip-medical');
   pill.style.padding = '9px 18px'; pill.style.fontSize = '13px';
-  document.getElementById('track-title').textContent = 'Front-desk foundations for ' + label.toLowerCase() + ' VAs';
 
   const tagClass = isDental ? 'tag-dental' : 'tag-medical';
-  const mods = await ericka.modulesFor(s.vertical);
+  const allMods = await ericka.modulesFor(s.vertical);
+  const onb = allMods.filter(m => m.category === 'onboarding');
+  const trn = allMods.filter(m => m.category === 'training');
+  const done = new Set(await ericka.progressFor(s.id));
 
-  async function render() {
-    const done = await ericka.progressFor(s.id);
-    const doneSet = new Set(done);
-    const doneCount = mods.filter(m => doneSet.has(m.id)).length;
-    document.getElementById('track-count').textContent = mods.length + ' modules · learn → quiz → practice';
-    document.getElementById('prog-bar').style.width = (mods.length ? Math.round(doneCount/mods.length*100) : 0) + '%';
-    document.getElementById('prog-text').textContent = doneCount + ' of ' + mods.length + ' complete';
+  const doneCount = allMods.filter(m => done.has(m.id)).length;
+  document.getElementById('track-count').textContent =
+    onb.length + ' onboarding · ' + trn.length + ' training modules';
+  document.getElementById('prog-bar').style.width =
+    (allMods.length ? Math.round(doneCount/allMods.length*100) : 0) + '%';
+  document.getElementById('prog-text').textContent = doneCount + ' of ' + allMods.length + ' complete';
 
-    const nextIdx = mods.findIndex(m => !doneSet.has(m.id));
-    const wrap = document.getElementById('mod-cards');
-    wrap.innerHTML = mods.map(function (m, i) {
-      if (doneSet.has(m.id)) {
-        return '<div class="ac"><span class="tag ' + tagClass + '" style="background:#e4f4ec;color:var(--ok)">✓ Done</span>'
+  // Render a track. Modules open the viewer; next-uncompleted is highlighted,
+  // later ones are locked until the one before is done (sequential).
+  function renderTrack(containerId, mods) {
+    const nextIdx = mods.findIndex(m => !done.has(m.id));
+    document.getElementById(containerId).innerHTML = mods.map(function (m, i) {
+      if (done.has(m.id)) {
+        return '<a href="module.html?id=' + m.id + '" class="ac"><span class="tag ' + tagClass + '" style="background:#e4f4ec;color:var(--ok)">✓ Done</span>'
           + '<span class="ic">' + (m.icon||'📘') + '</span><div class="t">' + m.title + '</div>'
-          + '<div class="d">Capability: ' + m.capability_label + '</div><span class="cta">Review →</span></div>';
+          + '<div class="d">' + (m.summary||('Capability: '+m.capability_label)) + '</div><span class="cta">Review →</span></a>';
       }
       if (i === nextIdx) {
-        return '<div class="ac mod-next" data-id="' + m.id + '" style="border-color:var(--gold);box-shadow:0 8px 26px rgba(193,149,63,.18);cursor:pointer">'
+        return '<a href="module.html?id=' + m.id + '" class="ac" style="border-color:var(--gold);box-shadow:0 8px 26px rgba(193,149,63,.18)">'
           + '<span class="tag ' + tagClass + '">▶ Next up</span><span class="ic">' + (m.icon||'📘') + '</span>'
           + '<div class="t">Module ' + m.ord + ' · ' + m.title + '</div>'
-          + '<div class="d">Earns: ' + m.capability_label + '. Tap to mark complete.</div>'
-          + '<span class="cta">Complete module →</span></div>';
+          + '<div class="d">' + (m.summary||'') + '</div><span class="cta">Open module →</span></a>';
       }
       return '<div class="ac" style="opacity:.55;cursor:not-allowed"><span class="tag" style="background:var(--line);color:var(--grey)">🔒 Locked</span>'
         + '<span class="ic">🔒</span><div class="t">' + m.title + '</div>'
         + '<div class="d">Unlocks when you finish the module before it.</div><span class="cta" style="color:var(--grey)">Locked</span></div>';
     }).join('');
-
-    const nextCard = wrap.querySelector('.mod-next');
-    if (nextCard) nextCard.addEventListener('click', async function () {
-      nextCard.style.pointerEvents = 'none';
-      await ericka.completeModule(s.id, nextCard.dataset.id);
-      render();
-    });
   }
-  render();
+  renderTrack('onb-cards', onb);
+  renderTrack('trn-cards', trn);
 })();
 </script>
 </body>

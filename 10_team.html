@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Team — Ericka Portal</title>
+<link rel="stylesheet" href="ericka.css">
+<style>
+  .client-head{font-family:var(--f-display);font-weight:600;font-size:22px;color:var(--ink);margin:32px 0 4px}
+  .site-head{display:flex;align-items:center;gap:10px;margin:20px 0 12px;font-weight:700;font-size:14px;color:var(--grey)}
+  .site-head .pin{width:26px;height:26px;border-radius:7px;background:var(--mist);display:flex;align-items:center;justify-content:center;font-size:13px}
+  .va-card{cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .1s}
+  .va-card:hover{border-color:var(--violet);box-shadow:0 8px 26px rgba(107,74,160,.15);transform:translateY(-2px)}
+  .mini{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grey)}
+  .modal-back{position:fixed;inset:0;background:rgba(36,27,51,.55);display:flex;align-items:center;justify-content:center;padding:20px;z-index:200}
+  .modal-card{background:#fff;border-radius:var(--r-xl);box-shadow:var(--shadow-lg);width:100%;max-width:480px;max-height:88vh;overflow:auto;padding:26px;position:relative}
+  .modal-x{position:absolute;top:16px;right:18px;border:none;background:none;font-size:26px;color:var(--grey);cursor:pointer}
+  .mod-row{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--line)}
+  .mod-row:last-child{border-bottom:none}
+  .mod-dot{width:22px;height:22px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+  .mod-dot.done{background:#e4f4ec;color:var(--ok)}
+  .mod-dot.todo{background:var(--cream);border:1.5px dashed var(--line);color:var(--grey)}
+  .mod-row .mt{font-size:13.5px;font-weight:600;color:var(--ink)}
+  .mod-row.todo .mt{color:var(--grey)}
+  .mod-row .ms{margin-left:auto;font-size:10.5px;font-weight:700;text-transform:uppercase}
+  .mod-row .ms.done{color:var(--ok)}.mod-row .ms.todo{color:var(--warn)}
+</style>
+</head>
+<body>
+
+<input type="checkbox" id="navtog">
+<div class="app-topbar">
+  <label class="burger" for="navtog"><span></span><span></span><span></span></label>
+  <div class="wm rev">Erick<span class="a">a</span></div>
+</div>
+
+<nav class="app-sidebar">
+  <div class="sidebar-brand">
+    <div class="wm rev">Erick<span class="a">a</span></div>
+    <svg class="pulse" viewBox="0 0 90 14" preserveAspectRatio="none"><path d="M2 7 H32 l4 -5 l5 10 l4 -8 l3 3 H88"/></svg>
+  </div>
+  <div class="nav-group-label">Manage</div>
+  <a id="nav-home" href="02_home.html"><span class="ic">🏠</span> Home</a>
+  <a href="10_team.html" class="active"><span class="ic">👥</span> Team</a>
+  <a href="01_welcome.html" class="logout" onclick="ericka.logout();return false;"><span class="ic">↩</span> Sign out</a>
+</nav>
+
+<div class="page">
+  <div class="hero">
+    <div class="hero-inner">
+      <div class="hero-left">
+        <div class="hero-label">Remote team</div>
+        <h1 class="hero-name">Where everyone's up to</h1>
+        <p class="hero-tagline">Onboarding and training progress across the whole remote team — tap a VA to see their modules.</p>
+      </div>
+      <div class="hero-right">
+        <div class="stat"><div class="v" id="s-vas">–</div><div class="l">VAs</div></div>
+        <div class="stat"><div class="v" id="s-onb">–</div><div class="l">Onboarded</div></div>
+        <div class="stat"><div class="v" id="s-trn">–</div><div class="l">Training done</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div id="board"><div class="panel" style="padding:26px;color:var(--grey)">Loading the team…</div></div>
+  </div>
+</div>
+
+<div id="va-modal" class="modal-back" style="display:none">
+  <div class="modal-card">
+    <button class="modal-x" onclick="document.getElementById('va-modal').style.display='none'">&times;</button>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+(async function () {
+  if (!ericka.ready()) return;
+  const s = ericka.requireRole(['admin','team_lead']);
+  if (!s) return;
+  document.getElementById('nav-home').href = ericka.homeFor(s.role);
+
+  const initials = n => n.replace(/\s*\(.*\)$/, '').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+  const board = await ericka.teamBoard();
+
+  // hero stats
+  document.getElementById('s-vas').textContent = board.length;
+  const onbFull = board.filter(v => v.onbTotal && v.onbDone === v.onbTotal).length;
+  const trnD = board.reduce((t,v)=>t+v.trnDone,0), trnT = board.reduce((t,v)=>t+v.trnTotal,0);
+  document.getElementById('s-onb').textContent = onbFull + '/' + board.length;
+  document.getElementById('s-trn').textContent = trnT ? Math.round(trnD/trnT*100)+'%' : '0%';
+
+  // group by client -> site
+  const byId = {};
+  const clients = [];
+  board.forEach(function (va) {
+    byId[va.id] = va;
+    let c = clients.find(x => x.name === va.client);
+    if (!c) { c = { name: va.client, sites: [] }; clients.push(c); }
+    let g = c.sites.find(x => x.name === va.site);
+    if (!g) { g = { name: va.site, vas: [] }; c.sites.push(g); }
+    g.vas.push(va);
+  });
+
+  function bar(done, total, gold) {
+    const pct = total ? Math.round(done/total*100) : 0;
+    return '<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:var(--grey)"><span>'
+      + (gold?'Training':'Onboarding') + '</span><span>' + done + ' / ' + total + '</span></div>'
+      + '<div class="pbar' + (gold?' gold':'') + '"><span style="width:' + pct + '%"></span></div>';
+  }
+  function cardHtml(va) {
+    const gold = va.vertical === 'medical';
+    const vbadge = gold ? '<span class="chip chip-medical">🩺 Medical</span>' : '<span class="chip chip-dental">🦷 Dental</span>';
+    const onbComplete = va.onbTotal && va.onbDone === va.onbTotal;
+    const status = onbComplete
+      ? '<span class="chip chip-ok">Onboarded</span>'
+      : '<span class="chip chip-open">Onboarding</span>';
+    return '<div class="panel va-card" data-id="' + va.id + '" style="padding:22px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">'
+      +   '<div class="who"><div class="avatar' + (gold?' gold':'') + '">' + initials(va.name) + '</div><b style="font-size:15px">' + va.name + '</b></div>'
+      +   status
+      + '</div>'
+      + '<div style="margin-top:16px">' + bar(va.onbDone, va.onbTotal, false) + '</div>'
+      + '<div style="margin-top:14px">' + bar(va.trnDone, va.trnTotal, true) + '</div>'
+      + '<div style="margin-top:14px;display:flex;justify-content:space-between;align-items:center">' + vbadge
+      +   '<span style="font-size:12px;font-weight:700;color:var(--violet)">View modules →</span></div>'
+      + '</div>';
+  }
+
+  document.getElementById('board').innerHTML = clients.map(function (c) {
+    return '<div class="client-head">' + c.name + '</div>'
+      + c.sites.map(function (g) {
+          return '<div class="site-head"><span class="pin">📍</span>' + g.name
+               + ' · ' + g.vas.length + ' VA' + (g.vas.length===1?'':'s') + '</div>'
+               + '<div class="cards c3">' + g.vas.map(cardHtml).join('') + '</div>';
+        }).join('');
+  }).join('');
+
+  // drill-down modal: onboarding + training checklists
+  function checklist(mods, cat) {
+    const rows = mods.filter(m => m.category === cat);
+    if (!rows.length) return '';
+    return '<div class="mini" style="margin:16px 0 6px">' + (cat==='onboarding'?'Onboarding':'Training') + '</div>'
+      + rows.map(function (m) {
+          return '<div class="mod-row ' + (m.done?'done':'todo') + '">'
+            + '<div class="mod-dot ' + (m.done?'done':'todo') + '">' + (m.done?'✓':m.ord) + '</div>'
+            + '<div class="mt">' + m.title + '</div>'
+            + '<div class="ms ' + (m.done?'done':'todo') + '">' + (m.done?'Done':'To do') + '</div></div>';
+        }).join('');
+  }
+  function openModal(va) {
+    const gold = va.vertical === 'medical';
+    document.getElementById('modal-body').innerHTML =
+      '<div class="who" style="margin-bottom:4px"><div class="avatar' + (gold?' gold':'') + '">' + initials(va.name) + '</div><b style="font-size:18px">' + va.name + '</b></div>'
+      + '<div style="font-size:13px;color:var(--grey);margin-bottom:6px">' + va.client + ' · 📍 ' + va.site + ' · ' + (gold?'Medical':'Dental') + '</div>'
+      + checklist(va.modules, 'onboarding')
+      + checklist(va.modules, 'training');
+    document.getElementById('va-modal').style.display = 'flex';
+  }
+  document.querySelectorAll('.va-card').forEach(function (c) {
+    c.addEventListener('click', function () { openModal(byId[c.dataset.id]); });
+  });
+  document.getElementById('va-modal').addEventListener('click', function (e) {
+    if (e.target === this) this.style.display = 'none';
+  });
+})();
+</script>
+</body>
+</html>

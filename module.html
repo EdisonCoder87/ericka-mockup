@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module — Ericka Portal</title>
+<link rel="stylesheet" href="ericka.css">
+<style>
+  .reader{max-width:760px;margin:0 auto;padding:30px 24px 70px}
+  .reader .back{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--violet);text-decoration:none;margin-bottom:18px}
+  .sec{background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow-sm);padding:24px 26px;margin-bottom:18px}
+  .sec h3{font-family:var(--f-display);font-weight:600;font-size:19px;color:var(--ink);margin-bottom:12px}
+  .md{font-size:15px;line-height:1.7;color:#33303a}
+  .md p{margin:0 0 12px}
+  .md ul,.md ol{margin:0 0 12px 20px}
+  .md li{margin:5px 0}
+  .md strong{color:var(--ink)}
+  .md blockquote{border-left:3px solid var(--gold);background:var(--cream);margin:0 0 12px;padding:10px 16px;border-radius:0 8px 8px 0;color:var(--ink)}
+  .md table{width:100%;border-collapse:collapse;margin:0 0 12px;font-size:13.5px}
+  .md th,.md td{border:1px solid var(--line);padding:8px 10px;text-align:left}
+  .md th{background:var(--cream);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--grey)}
+  .md code{background:var(--mist);padding:1px 5px;border-radius:4px;font-size:13px}
+  .done-banner{background:#e4f4ec;color:var(--ok);border:1px solid #bfe6cf;border-radius:var(--r-md);padding:14px 18px;font-weight:700;text-align:center;margin-bottom:18px}
+</style>
+</head>
+<body>
+<div class="reader">
+  <a class="back" id="back" href="06_va_training.html">← Back to training</a>
+  <div id="head" style="margin-bottom:18px">
+    <div id="mtag" class="chip chip-medical" style="margin-bottom:10px">Module</div>
+    <h1 style="font-family:var(--f-display);font-weight:600;font-size:28px;color:var(--ink)" id="mtitle">Loading…</h1>
+    <p style="color:var(--grey);font-size:14px;margin-top:6px" id="msum"></p>
+  </div>
+  <div id="done-banner" class="done-banner" style="display:none">✓ You've completed this module</div>
+  <div id="sections"></div>
+  <div id="cta" style="text-align:center;margin-top:8px"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+(async function () {
+  if (!ericka.ready()) return;
+  const s = ericka.requireRole(['va','admin','team_lead','client_admin']);
+  if (!s) return;
+
+  const id = new URLSearchParams(location.search).get('id');
+  if (!id) { location.href = ericka.homeFor(s.role); return; }
+
+  // send managers back to their own home, VAs back to training
+  document.getElementById('back').href =
+    (s.role === 'va') ? '06_va_training.html' : ericka.homeFor(s.role);
+
+  const mod = await ericka.moduleWithSections(id);
+  if (!mod) { document.getElementById('mtitle').textContent = 'Module not found'; return; }
+
+  const isOnb = mod.category === 'onboarding';
+  const tag = document.getElementById('mtag');
+  tag.textContent = (isOnb ? 'Onboarding' : 'Training') + ' · Module ' + mod.ord;
+  tag.className = 'chip ' + (isOnb ? 'chip-dental' : 'chip-medical');
+  document.getElementById('mtitle').textContent = mod.title;
+  document.getElementById('msum').textContent = mod.summary || '';
+
+  document.getElementById('sections').innerHTML = mod.sections.map(function (sec) {
+    return '<div class="sec">' + (sec.heading ? '<h3>' + sec.heading + '</h3>' : '')
+      + '<div class="md">' + marked.parse(sec.body || '') + '</div></div>';
+  }).join('');
+
+  // completion state + action (only VAs mark their own progress)
+  const done = new Set(await ericka.progressFor(s.id));
+  const isDone = done.has(mod.id);
+  if (isDone) document.getElementById('done-banner').style.display = 'block';
+
+  const cta = document.getElementById('cta');
+  if (s.role === 'va' && !isDone) {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-primary';
+    btn.style.padding = '15px 40px';
+    btn.textContent = '✓ Mark this module complete';
+    btn.onclick = async function () {
+      btn.disabled = true; btn.textContent = 'Saving…';
+      await ericka.completeModule(s.id, mod.id);
+      location.href = (isOnb ? '05_va_home.html' : '06_va_training.html');
+    };
+    cta.appendChild(btn);
+  } else if (s.role !== 'va') {
+    cta.innerHTML = '<p style="color:var(--grey);font-size:13px">Manager view — read only.</p>';
+  }
+})();
+</script>
+</body>
+</html>

@@ -132,8 +132,13 @@
     g.vas.push(va);
   });
 
+  function miniBar(label, done, total, gold) {
+    const pct = total ? Math.round(done/total*100) : 0;
+    return '<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:var(--grey)"><span>'
+      + label + '</span><span>' + done + ' / ' + total + '</span></div>'
+      + '<div class="pbar' + (gold?' gold':'') + '"><span style="width:' + pct + '%"></span></div>';
+  }
   function cardHtml(va) {
-    const pct  = va.modulesTotal ? Math.round(va.modulesDone/va.modulesTotal*100) : 0;
     const gold = va.vertical === 'medical';
     const vbadge = gold ? '<span class="chip chip-medical">🩺 Medical</span>'
                         : '<span class="chip chip-dental">🦷 Dental</span>';
@@ -146,10 +151,8 @@
       +     '<div class="who"><div class="avatar' + (gold?' gold':'') + '">' + initials(va.name) + '</div><b style="font-size:16px">' + va.name + '</b></div>'
       +     vbadge
       +   '</div>'
-      +   '<div style="margin-top:18px">'
-      +     '<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:var(--grey)"><span>Training</span><span>' + va.modulesDone + ' / ' + va.modulesTotal + ' modules</span></div>'
-      +     '<div class="pbar' + (gold?' gold':'') + '"><span style="width:' + pct + '%"></span></div>'
-      +   '</div>'
+      +   '<div style="margin-top:18px">' + miniBar('Onboarding', va.onbDone, va.onbTotal, false) + '</div>'
+      +   '<div style="margin-top:12px">' + miniBar('Training', va.trnDone, va.trnTotal, gold) + '</div>'
       +   '<div style="margin-top:18px">'
       +     '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin-bottom:8px">Capabilities</div>'
       +     '<div>' + caps + '</div>'
@@ -175,23 +178,28 @@
   }).join('');
 
   // ---- drill-down modal --------------------------------------------------
+  function checklist(mods, cat, label) {
+    const rows = mods.filter(m => m.category === cat);
+    if (!rows.length) return '';
+    return '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin:16px 0 4px">' + label + '</div>'
+      + rows.map(function (m) {
+          const done = m.done;
+          return '<div class="mod-row ' + (done?'done':'todo') + '">'
+            + '<div class="mod-dot ' + (done?'done':'todo') + '">' + (done?'✓':(m.ord)) + '</div>'
+            + '<div class="mt">' + m.title + '</div>'
+            + '<div class="ms ' + (done?'done':'todo') + '">' + (done?'Done':'Remaining') + '</div>'
+            + '</div>';
+        }).join('');
+  }
   function openModal(va) {
     const gold = va.vertical === 'medical';
-    const rows = va.modules.map(function (m) {
-      const done = m.done;
-      return '<div class="mod-row ' + (done?'done':'todo') + '">'
-        + '<div class="mod-dot ' + (done?'done':'todo') + '">' + (done?'✓':(m.ord)) + '</div>'
-        + '<div class="mt">Module ' + m.ord + ' · ' + m.title + '</div>'
-        + '<div class="ms ' + (done?'done':'todo') + '">' + (done?'Done':'Remaining') + '</div>'
-        + '</div>';
-    }).join('');
+    const rows = checklist(va.modules, 'onboarding', 'Onboarding') + checklist(va.modules, 'training', 'Training');
     const perf = va.performance.length
       ? va.performance.map(p => '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span style="color:var(--grey)">'+p.label+'</span><b>'+p.value+'</b></div>').join('')
       : '<span style="font-size:13px;color:var(--grey)">No performance data yet — coming soon.</span>';
     document.getElementById('modal-body').innerHTML = ''
       + '<div class="who" style="margin-bottom:4px"><div class="avatar' + (gold?' gold':'') + '">' + initials(va.name) + '</div><b style="font-size:18px">' + va.name + '</b></div>'
-      + '<div style="font-size:13px;color:var(--grey);margin-bottom:16px">' + (gold?'🩺 Medical':'🦷 Dental') + ' · 📍 ' + va.site + ' · ' + va.modulesDone + ' of ' + va.modulesTotal + ' modules complete</div>'
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin-bottom:6px">Training modules</div>'
+      + '<div style="font-size:13px;color:var(--grey);margin-bottom:6px">' + (gold?'🩺 Medical':'🦷 Dental') + ' · 📍 ' + va.site + ' · ' + va.modulesDone + ' of ' + va.modulesTotal + ' modules complete</div>'
       + rows
       + '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin:20px 0 6px">Performance</div>'
       + perf;
