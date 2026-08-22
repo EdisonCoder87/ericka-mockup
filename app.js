@@ -116,9 +116,9 @@
   // completed modules), week hours + billable amount. NO pay_rate is fetched.
   async function clientBoard(clientId) {
     const { data: vas, error: e1 } = await sb.from("users")
-      .select("id,name,vertical,billable_rate")            // note: pay_rate NOT selected
+      .select("id,name,vertical,billable_rate,site")       // note: pay_rate NOT selected
       .eq("client_id", clientId).eq("role", "va").eq("active", true)
-      .order("name");
+      .order("site").order("name");
     if (e1) throw e1;
     if (!vas || !vas.length) return [];
 
@@ -130,15 +130,19 @@
     for (const va of vas) {
       const mods  = modsByVertical[va.vertical] || [];
       const doneIds = await progressFor(va.id);
-      const doneMods = mods.filter(m => doneIds.indexOf(m.id) !== -1);
+      const doneSet = new Set(doneIds);
+      const doneMods = mods.filter(m => doneSet.has(m.id));
       const shifts = await weekShifts(va.id);
       const hours  = sumHours(shifts);
       const { data: perf } = await sb.from("performance_metrics")
         .select("label,value,period").eq("user_id", va.id);
       out.push({
         id: va.id, name: va.name, vertical: va.vertical,
+        site: va.site || "Unassigned",
         modulesDone: doneMods.length, modulesTotal: mods.length,
         capabilities: doneMods.map(m => m.capability_label),
+        // full ordered list for the drill-down (title + done flag, no deeper detail)
+        modules: mods.map(m => ({ ord: m.ord, title: m.title, icon: m.icon, done: doneSet.has(m.id) })),
         hours: hours,
         billable: hours * Number(va.billable_rate || 0),
         performance: perf || []

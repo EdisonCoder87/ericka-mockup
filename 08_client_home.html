@@ -5,6 +5,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>My Team — Ericka Client Portal</title>
 <link rel="stylesheet" href="ericka.css">
+<style>
+  .site-head{display:flex;align-items:center;gap:10px;margin:30px 0 14px;font-family:var(--f-display);font-weight:600;font-size:19px;color:var(--ink)}
+  .site-head .pin{width:30px;height:30px;border-radius:8px;background:var(--mist);display:flex;align-items:center;justify-content:center;font-size:15px}
+  .site-head .n{font-family:var(--f-body);font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--grey);background:#fff;border:1px solid var(--line);padding:3px 9px;border-radius:999px}
+  .va-card{cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .1s}
+  .va-card:hover{border-color:var(--violet);box-shadow:0 8px 26px rgba(107,74,160,.15);transform:translateY(-2px)}
+  .modal-back{position:fixed;inset:0;background:rgba(36,27,51,.55);display:flex;align-items:center;justify-content:center;padding:20px;z-index:200}
+  .modal-card{background:#fff;border-radius:var(--r-xl);box-shadow:var(--shadow-lg);width:100%;max-width:460px;max-height:88vh;overflow:auto;padding:26px 26px 24px;position:relative}
+  .modal-x{position:absolute;top:16px;right:18px;border:none;background:none;font-size:26px;line-height:1;color:var(--grey);cursor:pointer}
+  .mod-row{display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid var(--line)}
+  .mod-row:last-child{border-bottom:none}
+  .mod-dot{width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+  .mod-dot.done{background:#e4f4ec;color:var(--ok)}
+  .mod-dot.todo{background:var(--cream);border:1.5px dashed var(--line);color:var(--grey)}
+  .mod-row .mt{font-size:14px;font-weight:600;color:var(--ink)}
+  .mod-row.todo .mt{color:var(--grey)}
+  .mod-row .ms{margin-left:auto;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+  .mod-row .ms.done{color:var(--ok)}
+  .mod-row .ms.todo{color:var(--warn)}
+</style>
 </head>
 <body>
 
@@ -47,8 +67,8 @@
   </div>
 
   <div class="wrap">
-    <div class="section-h" id="board">Your team <span>capabilities · training · hours</span></div>
-    <div id="board-cards" class="cards c2">
+    <div class="section-h" id="board">Your team <span>grouped by site · tap a VA for their modules</span></div>
+    <div id="board-cards">
       <div class="panel" style="padding:26px;color:var(--grey)">Loading your team…</div>
     </div>
 
@@ -59,6 +79,14 @@
         <div class="qa">— The Ericka Way</div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- VA drill-down modal -->
+<div id="va-modal" class="modal-back" style="display:none">
+  <div class="modal-card">
+    <button class="modal-x" onclick="document.getElementById('va-modal').style.display='none'">&times;</button>
+    <div id="modal-body"></div>
   </div>
 </div>
 
@@ -94,7 +122,17 @@
     return;
   }
 
-  el.innerHTML = board.map(function (va) {
+  // index VAs by id for the modal, and group by site (board is already site-ordered)
+  const byId = {};
+  const sites = [];
+  board.forEach(function (va) {
+    byId[va.id] = va;
+    let g = sites.find(s => s.name === va.site);
+    if (!g) { g = { name: va.site, vas: [] }; sites.push(g); }
+    g.vas.push(va);
+  });
+
+  function cardHtml(va) {
     const pct  = va.modulesTotal ? Math.round(va.modulesDone/va.modulesTotal*100) : 0;
     const gold = va.vertical === 'medical';
     const vbadge = gold ? '<span class="chip chip-medical">🩺 Medical</span>'
@@ -102,12 +140,8 @@
     const caps = va.capabilities.length
       ? va.capabilities.map(c => '<span class="chip chip-ok" style="margin:0 6px 6px 0">✓ ' + c + '</span>').join('')
       : '<span style="font-size:13px;color:var(--grey)">No capabilities earned yet.</span>';
-    const perf = va.performance.length
-      ? va.performance.map(p => '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span style="color:var(--grey)">'+p.label+'</span><b>'+p.value+'</b></div>').join('')
-      : '<span style="font-size:13px;color:var(--grey)">No performance data yet — coming soon.</span>';
-
     return ''
-      + '<div class="panel" style="padding:24px">'
+      + '<div class="panel va-card" data-id="' + va.id + '" style="padding:24px">'
       +   '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">'
       +     '<div class="who"><div class="avatar' + (gold?' gold':'') + '">' + initials(va.name) + '</div><b style="font-size:16px">' + va.name + '</b></div>'
       +     vbadge
@@ -130,12 +164,46 @@
       +       '<div style="font-family:var(--f-display);font-weight:600;font-size:24px;margin-top:2px;color:var(--gold-text)">$' + va.billable.toFixed(0) + '</div>'
       +     '</div>'
       +   '</div>'
-      +   '<div style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px">'
-      +     '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin-bottom:8px">Performance</div>'
-      +     perf
-      +   '</div>'
+      +   '<div style="margin-top:16px;text-align:center;font-size:12px;font-weight:700;color:var(--violet)">Tap to see modules →</div>'
       + '</div>';
+  }
+
+  el.innerHTML = sites.map(function (g) {
+    return '<div class="site-head"><span class="pin">📍</span>' + g.name
+         + '<span class="n">' + g.vas.length + ' VA' + (g.vas.length===1?'':'s') + '</span></div>'
+         + '<div class="cards c2">' + g.vas.map(cardHtml).join('') + '</div>';
   }).join('');
+
+  // ---- drill-down modal --------------------------------------------------
+  function openModal(va) {
+    const gold = va.vertical === 'medical';
+    const rows = va.modules.map(function (m) {
+      const done = m.done;
+      return '<div class="mod-row ' + (done?'done':'todo') + '">'
+        + '<div class="mod-dot ' + (done?'done':'todo') + '">' + (done?'✓':(m.ord)) + '</div>'
+        + '<div class="mt">Module ' + m.ord + ' · ' + m.title + '</div>'
+        + '<div class="ms ' + (done?'done':'todo') + '">' + (done?'Done':'Remaining') + '</div>'
+        + '</div>';
+    }).join('');
+    const perf = va.performance.length
+      ? va.performance.map(p => '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span style="color:var(--grey)">'+p.label+'</span><b>'+p.value+'</b></div>').join('')
+      : '<span style="font-size:13px;color:var(--grey)">No performance data yet — coming soon.</span>';
+    document.getElementById('modal-body').innerHTML = ''
+      + '<div class="who" style="margin-bottom:4px"><div class="avatar' + (gold?' gold':'') + '">' + initials(va.name) + '</div><b style="font-size:18px">' + va.name + '</b></div>'
+      + '<div style="font-size:13px;color:var(--grey);margin-bottom:16px">' + (gold?'🩺 Medical':'🦷 Dental') + ' · 📍 ' + va.site + ' · ' + va.modulesDone + ' of ' + va.modulesTotal + ' modules complete</div>'
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin-bottom:6px">Training modules</div>'
+      + rows
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin:20px 0 6px">Performance</div>'
+      + perf;
+    document.getElementById('va-modal').style.display = 'flex';
+  }
+
+  el.querySelectorAll('.va-card').forEach(function (c) {
+    c.addEventListener('click', function () { openModal(byId[c.dataset.id]); });
+  });
+  document.getElementById('va-modal').addEventListener('click', function (e) {
+    if (e.target === this) this.style.display = 'none';   // click backdrop to close
+  });
 })();
 </script>
 </body>
