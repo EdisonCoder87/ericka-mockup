@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Performance — Ericka Portal</title>
+<link rel="stylesheet" href="ericka.css">
+<style>
+  .reader{max-width:1180px;margin:0 auto;padding:26px 20px 70px}
+  .reader .back{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--violet);text-decoration:none;margin-bottom:16px}
+  table.scoreboard{width:100%;border-collapse:collapse;font-size:13px;white-space:nowrap}
+  table.scoreboard th,table.scoreboard td{border:1px solid var(--line);padding:8px 10px;text-align:center}
+  table.scoreboard thead th{background:var(--cream);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--grey);font-weight:700}
+  table.scoreboard tbody tr:hover td{background:#faf8fd}
+</style>
+</head>
+<body>
+<div class="reader">
+  <a class="back" id="back" href="05_va_home.html">← Back</a>
+  <div style="margin-bottom:14px">
+    <div class="chip chip-medical" style="margin-bottom:10px">Team leaderboard</div>
+    <h1 style="font-family:var(--f-display);font-weight:600;font-size:28px;color:var(--ink)">Performance at a glance</h1>
+    <p style="color:var(--grey);font-size:13px;margin-top:6px" id="sub">This week — how the team is tracking.</p>
+  </div>
+  <div id="board"><div class="panel" style="padding:26px;color:var(--grey)">Loading…</div></div>
+  <p style="font-size:12px;color:var(--grey);margin-top:14px" id="footnote"></p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+(async function () {
+  if (!ericka.ready()) return;
+  const s = ericka.requireRole(['va','team_lead','admin','client_admin']);
+  if (!s) return;
+  document.getElementById('back').href = ericka.homeFor(s.role);
+
+  const rates = await ericka.perfRates();
+  // VAs & the client see their own client's team; managers see everyone.
+  const list = (s.role === 'admin' || s.role === 'team_lead')
+    ? await ericka.teamBoard()
+    : await ericka.clientBoard(s.client_id);
+
+  document.getElementById('board').innerHTML =
+    list.length ? ericka.buildScoreboard(list, rates)
+                : '<div class="panel" style="padding:26px;color:var(--grey)">No team members yet.</div>';
+
+  document.getElementById('footnote').textContent =
+    'Calls entered from 3CX · bookings from HotDoc/Pracsoft (team lead). '
+    + 'CP revenue = Booked × $' + rates.cp_value.toFixed(2) + ' · HA revenue = Booked × $' + rates.ha_value.toFixed(2)
+    + ' · Arrears = $ actually collected.';
+})();
+</script>
+</body>
+</html>

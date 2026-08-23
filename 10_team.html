@@ -42,6 +42,7 @@
   <div class="nav-group-label">Manage</div>
   <a id="nav-home" href="02_home.html"><span class="ic">🏠</span> Home</a>
   <a href="10_team.html" class="active"><span class="ic">👥</span> Team</a>
+  <a href="performance.html"><span class="ic">📊</span> Performance</a>
   <a href="01_welcome.html" class="logout" onclick="ericka.logout();return false;"><span class="ic">↩</span> Sign out</a>
 </nav>
 
@@ -62,6 +63,7 @@
   </div>
 
   <div class="wrap">
+    <div id="rates-bar" style="margin-bottom:18px"></div>
     <div id="board"><div class="panel" style="padding:26px;color:var(--grey)">Loading the team…</div></div>
   </div>
 </div>
@@ -85,6 +87,22 @@
 
   const initials = n => n.replace(/\s*\(.*\)$/, '').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
   const board = await ericka.teamBoard();
+
+  // Revenue-rate editor (CP & HA bulk-billed values used to auto-calc revenue)
+  const rates = await ericka.perfRates();
+  const rb = document.getElementById('rates-bar');
+  rb.innerHTML = '<div class="panel" style="padding:16px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">'
+    + '<div style="font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--grey)">Revenue rates (auto-calc)</div>'
+    + '<label style="font-size:12px;font-weight:700;color:var(--grey)">CP Review $ <input id="r-cp" type="number" step="0.01" value="' + rates.cp_value + '" style="width:100px;padding:7px 9px;display:inline-block"></label>'
+    + '<label style="font-size:12px;font-weight:700;color:var(--grey)">Health Assessment $ <input id="r-ha" type="number" step="0.01" value="' + rates.ha_value + '" style="width:100px;padding:7px 9px;display:inline-block"></label>'
+    + '<button id="r-save" class="btn btn-ghost" style="padding:8px 18px">Save rates</button>'
+    + '<span id="r-msg" style="font-size:13px;color:var(--ok);font-weight:700"></span></div>';
+  document.getElementById('r-save').onclick = async function () {
+    const cp = parseFloat(document.getElementById('r-cp').value) || 0;
+    const ha = parseFloat(document.getElementById('r-ha').value) || 0;
+    try { await ericka.savePerfRates(cp, ha); document.getElementById('r-msg').textContent = 'Saved ✓ (reopen to recalc)'; }
+    catch (e) { document.getElementById('r-msg').style.color = 'var(--danger)'; document.getElementById('r-msg').textContent = 'Failed: ' + (e.message||e); }
+  };
 
   // hero stats
   document.getElementById('s-vas').textContent = board.length;
@@ -161,20 +179,45 @@
       + label + '</label><input id="' + id + '" type="number" min="0" inputmode="numeric" value="' + (val==null?'':val)
       + '" style="padding:9px 11px"><div style="font-size:10px;color:var(--grey);margin-top:2px">' + hint + '</div></div>';
   }
+  function subHead(t) {
+    return '<div style="font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--violet);margin:14px 0 6px">' + t + '</div>';
+  }
   function prodForm(va) {
     const p = va.productivity || {};
     return '<div style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px">'
-      + '<div class="mini" style="margin-bottom:8px">Productivity — enter from 3CX / HotDoc / Pracsoft</div>'
+      + '<div class="mini" style="margin-bottom:8px">Productivity — enter from 3CX / HotDoc / Pracsoft (revenue auto-calculates)</div>'
       + '<label style="font-size:11px;font-weight:700;color:var(--grey)">Period</label>'
-      + '<input id="p-period" value="' + (p.period_label || weekLabel()) + '" style="padding:9px 11px;margin-bottom:10px">'
+      + '<input id="p-period" value="' + (p.period_label || weekLabel()) + '" style="padding:9px 11px;margin-bottom:4px">'
+      + subHead('Inbound')
       + '<div style="display:flex;gap:10px;flex-wrap:wrap">'
-      +   numField('p-calls','Calls','3CX', p.calls)
-      +   numField('p-bookings','Bookings','HotDoc/Pracsoft', p.bookings)
-      +   numField('p-payments','Payments','HotDoc', p.payments)
+      +   numField('p-calls_inbound','Calls inbound','3CX', p.calls_inbound)
+      +   numField('p-scans','Scans','', p.scans)
       + '</div>'
-      + '<label style="font-size:11px;font-weight:700;color:var(--grey);margin-top:10px;display:block">Notes (optional)</label>'
+      + subHead('Outbound · Confirmation')
+      + '<div style="display:flex;gap:10px;flex-wrap:wrap">'
+      +   numField('p-confirmation_calls','Confirmation calls','', p.confirmation_calls)
+      + '</div>'
+      + subHead('Outbound · Arrears')
+      + '<div style="display:flex;gap:10px;flex-wrap:wrap">'
+      +   numField('p-arrears_total','Calls','total', p.arrears_total)
+      +   numField('p-arrears_answered','Pt answered','picked up', p.arrears_answered)
+      +   numField('p-arrears_collected','Collected $','entered', p.arrears_collected)
+      + '</div>'
+      + subHead('Outbound · Care Plan Review')
+      + '<div style="display:flex;gap:10px;flex-wrap:wrap">'
+      +   numField('p-cpr_total','Calls','total', p.cpr_total)
+      +   numField('p-cpr_picked_up','Picked up','', p.cpr_picked_up)
+      +   numField('p-cpr_booked','Booked','→ revenue', p.cpr_booked)
+      + '</div>'
+      + subHead('Outbound · Health Assessment')
+      + '<div style="display:flex;gap:10px;flex-wrap:wrap">'
+      +   numField('p-ha_due','Due','count', p.ha_due)
+      +   numField('p-ha_picked_up','Picked up','', p.ha_picked_up)
+      +   numField('p-ha_booked','Booked','→ revenue', p.ha_booked)
+      + '</div>'
+      + '<label style="font-size:11px;font-weight:700;color:var(--grey);margin-top:12px;display:block">Notes (optional)</label>'
       + '<input id="p-notes" value="' + (p.notes ? String(p.notes).replace(/"/g,'&quot;') : '') + '" style="padding:9px 11px">'
-      + '<div style="display:flex;align-items:center;gap:12px;margin-top:12px">'
+      + '<div style="display:flex;align-items:center;gap:12px;margin-top:14px">'
       +   '<button id="p-save" class="btn btn-primary" style="padding:11px 24px">Save productivity</button>'
       +   '<span id="p-msg" style="font-size:13px;color:var(--ok);font-weight:700"></span>'
       + '</div>'
@@ -194,20 +237,20 @@
     const save = document.getElementById('p-save');
     save.onclick = async function () {
       save.disabled = true; save.textContent = 'Saving…';
-      const num = id => parseInt(document.getElementById(id).value, 10) || 0;
+      const val = f => {
+        const raw = document.getElementById('p-' + f).value;
+        return f === 'arrears_collected' ? (parseFloat(raw) || 0) : (parseInt(raw, 10) || 0);
+      };
+      const payload = {
+        userId: va.id, clientId: va.client_id,
+        period: document.getElementById('p-period').value.trim() || weekLabel(),
+        notes: document.getElementById('p-notes').value.trim(), by: s.id
+      };
+      const local = { period_label: payload.period, notes: payload.notes, updated_at: new Date().toISOString() };
+      ericka.PROD_FIELDS.forEach(f => { payload[f] = val(f); local[f] = val(f); });
       try {
-        await ericka.saveProductivity({
-          userId: va.id, clientId: va.client_id,
-          period: document.getElementById('p-period').value.trim() || weekLabel(),
-          calls: num('p-calls'), bookings: num('p-bookings'), payments: num('p-payments'),
-          notes: document.getElementById('p-notes').value.trim(), by: s.id
-        });
-        // reflect locally so a re-open shows the new values
-        va.productivity = {
-          period_label: document.getElementById('p-period').value.trim(),
-          calls: num('p-calls'), bookings: num('p-bookings'), payments: num('p-payments'),
-          notes: document.getElementById('p-notes').value.trim(), updated_at: new Date().toISOString()
-        };
+        await ericka.saveProductivity(payload);
+        va.productivity = local;   // reflect locally for a re-open
         document.getElementById('p-msg').textContent = 'Saved ✓';
       } catch (e) {
         document.getElementById('p-msg').style.color = 'var(--danger)';

@@ -3,17 +3,18 @@
 Everything's built and pushed. There's **one manual step only you can do**: run the SQL
 migrations in Supabase (I can't run database changes with just the public key).
 
-## 1. Run the migrations — in this exact order
-Supabase → **SQL Editor** → **New query** → paste the whole file → **Run** (choose
-**"Run without RLS"** each time). Do them in order:
+## 1. Migrations — I run these for you
+Claude runs the SQL migrations directly via the Supabase Management API (`run_migrations.js`
+with your access token), so you don't touch the SQL editor. Current set (01→06):
 
-1. `migration_01_sites.sql` — sites (Footscray/Essendon) + Grace *(skip if you already ran it)*
+1. `migration_01_sites.sql` — sites (Footscray/Essendon) + Grace
 2. `migration_02_structure.sql` — 16 modules + the team-lead role
-3. `migration_03_content.sql` — all module content + the Footscray cheat sheet
+3. `migration_03_content.sql` — module content + the Footscray cheat sheet
 4. `migration_04_quizzes.sql` — the quizzes
+5. `migration_05_productivity.sql` — (superseded by 06)
+6. `migration_06_scorecard.sql` — the full performance scorecard + revenue rates
 
-Each should say **"Success. No rows returned."** If one errors, stop and tell me the message —
-don't run the later ones.
+If you'd rather run one yourself: SQL Editor → New query → paste the file → **Run without RLS**.
 
 ## 2. Live site
 https://edisoncoder87.github.io/ericka-mockup/ (give it ~1 min to rebuild after you push)

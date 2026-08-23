@@ -170,17 +170,104 @@
       return data;
     } catch (e) { return null; }   // table may not exist until migration 05 runs
   }
+  const PROD_FIELDS = [
+    "calls_inbound","scans","confirmation_calls",
+    "arrears_total","arrears_answered","arrears_collected",
+    "cpr_total","cpr_picked_up","cpr_booked",
+    "ha_due","ha_picked_up","ha_booked"
+  ];
   async function saveProductivity(p) {
     const row = {
-      user_id: p.userId, client_id: p.clientId || null,
-      period_label: p.period,
-      calls: p.calls || 0, bookings: p.bookings || 0, payments: p.payments || 0,
+      user_id: p.userId, client_id: p.clientId || null, period_label: p.period,
       notes: p.notes || null, updated_by: p.by || null,
       updated_at: new Date().toISOString()
     };
+    PROD_FIELDS.forEach(f => { row[f] = p[f] || 0; });
     const { error } = await sb.from("productivity")
       .upsert(row, { onConflict: "user_id,period_label" });
     if (error) throw error;
+  }
+
+  // Configurable bulk-billed values used to auto-calc CP & HA revenue.
+  async function perfRates() {
+    try {
+      const { data } = await sb.from("perf_rates").select("cp_value,ha_value").eq("id", 1).maybeSingle();
+      if (data) return { cp_value: Number(data.cp_value), ha_value: Number(data.ha_value) };
+    } catch (e) {}
+    return { cp_value: 79.70, ha_value: 246.65 };
+  }
+  async function savePerfRates(cp, ha) {
+    const { error } = await sb.from("perf_rates")
+      .upsert({ id: 1, cp_value: cp, ha_value: ha, updated_at: new Date().toISOString() },
+              { onConflict: "id" });
+    if (error) throw error;
+  }
+
+  // Derive the revenue + rate figures for one VA's productivity row.
+  function perfDerived(p, rates) {
+    p = p || {};
+    const cprRev = (p.cpr_booked || 0) * rates.cp_value;
+    const haRev  = (p.ha_booked  || 0) * rates.ha_value;
+    const arr    = Number(p.arrears_collected || 0);
+    return { cprRev, haRev, arrears: arr, total: cprRev + haRev + arr };
+  }
+
+  // Build the shared leaderboard table HTML from a list of board rows
+  // (each has .name/.site/.productivity). Sorted by total revenue desc.
+  function buildScoreboard(list, rates) {
+    const money = v => "$" + Math.round(v).toLocaleString();
+    const pct = (a, b) => b ? Math.round(a / b * 100) + "%" : "–";
+    const rows = list.map(v => ({ v, d: perfDerived(v.productivity, rates) }))
+                     .sort((a, b) => b.d.total - a.d.total);
+
+    const stick = "position:sticky;left:0;background:#fff;z-index:1;text-align:left";
+    const rev = "background:#faf4e8";                       // revenue column tint
+    let body = "";
+    const tot = {}; ["calls_inbound","scans","confirmation_calls","arrears_total","arrears_answered",
+      "cpr_total","cpr_picked_up","cpr_booked","ha_due","ha_picked_up","ha_booked"].forEach(k => tot[k]=0);
+    let tArr=0,tCpr=0,tHa=0,tAll=0;
+
+    rows.forEach(function (r, i) {
+      const p = r.v.productivity;
+      if (!p) {
+        body += '<tr><td style="'+stick+'"><b>'+r.v.name+'</b><div style="font-size:11px;color:var(--grey)">📍 '+r.v.site+'</div></td>'
+             + '<td colspan="15" style="color:var(--grey);text-align:center">Awaiting team-lead entry</td></tr>';
+        return;
+      }
+      ["calls_inbound","scans","confirmation_calls","arrears_total","arrears_answered",
+       "cpr_total","cpr_picked_up","cpr_booked","ha_due","ha_picked_up","ha_booked"].forEach(k => tot[k]+=(p[k]||0));
+      tArr+=r.d.arrears; tCpr+=r.d.cprRev; tHa+=r.d.haRev; tAll+=r.d.total;
+      const medal = i===0?'🥇 ':i===1?'🥈 ':i===2?'🥉 ':'';
+      body += '<tr>'
+        + '<td style="'+stick+'"><b>'+medal+r.v.name+'</b><div style="font-size:11px;color:var(--grey)">📍 '+r.v.site+'</div></td>'
+        + '<td>'+(p.calls_inbound||0)+'</td><td>'+(p.scans||0)+'</td>'
+        + '<td>'+(p.confirmation_calls||0)+'</td>'
+        + '<td>'+(p.arrears_total||0)+'</td><td>'+(p.arrears_answered||0)+' <span style="color:var(--grey);font-size:11px">'+pct(p.arrears_answered,p.arrears_total)+'</span></td><td style="'+rev+'">'+money(r.d.arrears)+'</td>'
+        + '<td>'+(p.cpr_total||0)+'</td><td>'+(p.cpr_picked_up||0)+' <span style="color:var(--grey);font-size:11px">'+pct(p.cpr_picked_up,p.cpr_total)+'</span></td><td>'+(p.cpr_booked||0)+'</td><td style="'+rev+'">'+money(r.d.cprRev)+'</td>'
+        + '<td>'+(p.ha_due||0)+'</td><td>'+(p.ha_picked_up||0)+' <span style="color:var(--grey);font-size:11px">'+pct(p.ha_picked_up,p.ha_due)+'</span></td><td>'+(p.ha_booked||0)+'</td><td style="'+rev+'">'+money(r.d.haRev)+'</td>'
+        + '<td style="'+rev+';font-weight:700">'+money(r.d.total)+'</td>'
+        + '</tr>';
+    });
+
+    const T = '<tr style="border-top:2px solid var(--line);font-weight:700;background:var(--cream)">'
+      + '<td style="'+stick+';background:var(--cream)">Team total</td>'
+      + '<td>'+tot.calls_inbound+'</td><td>'+tot.scans+'</td><td>'+tot.confirmation_calls+'</td>'
+      + '<td>'+tot.arrears_total+'</td><td>'+tot.arrears_answered+'</td><td style="'+rev+'">'+money(tArr)+'</td>'
+      + '<td>'+tot.cpr_total+'</td><td>'+tot.cpr_picked_up+'</td><td>'+tot.cpr_booked+'</td><td style="'+rev+'">'+money(tCpr)+'</td>'
+      + '<td>'+tot.ha_due+'</td><td>'+tot.ha_picked_up+'</td><td>'+tot.ha_booked+'</td><td style="'+rev+'">'+money(tHa)+'</td>'
+      + '<td style="'+rev+'">'+money(tAll)+'</td></tr>';
+
+    return '<div class="panel" style="overflow-x:auto"><table class="scoreboard">'
+      + '<thead>'
+      + '<tr><th rowspan="2" style="'+stick+'">VA</th>'
+      +   '<th colspan="2">Inbound</th><th rowspan="2">Confirm calls</th>'
+      +   '<th colspan="3">Arrears</th><th colspan="4">Care Plan Review</th>'
+      +   '<th colspan="4">Health Assessment</th><th rowspan="2">Total $</th></tr>'
+      + '<tr><th>Calls</th><th>Scans</th>'
+      +   '<th>Calls</th><th>Ans</th><th>Coll $</th>'
+      +   '<th>Calls</th><th>Pick</th><th>Book</th><th>Rev $</th>'
+      +   '<th>Due</th><th>Pick</th><th>Book</th><th>Rev $</th></tr>'
+      + '</thead><tbody>' + body + T + '</tbody></table></div>';
   }
 
   /* ---- client-admin board (view-only, scoped to one client) ------------- */
@@ -297,7 +384,8 @@
     modulesFor, moduleWithSections, progressFor, completeModule, quizFor,
     cheatsheetForSite, siteHasCheatsheet, revealCheatsheetNav,
     clientBoard, teamBoard, adminStats,
-    productivityFor, saveProductivity,
+    productivityFor, saveProductivity, PROD_FIELDS,
+    perfRates, savePerfRates, perfDerived, buildScoreboard,
     // small helper: bail out gracefully if keys aren't set yet
     ready() {
       if (!window.ERICKA_CONFIGURED) {

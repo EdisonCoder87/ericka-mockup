@@ -42,6 +42,7 @@
   </div>
   <div class="nav-group-label">Your team</div>
   <a href="08_client_home.html" class="active"><span class="ic">🏠</span> Home</a>
+  <a href="performance.html"><span class="ic">📊</span> Performance</a>
   <a href="#board"><span class="ic">👥</span> My VAs</a>
   <a href="01_welcome.html" class="logout" onclick="ericka.logout();return false;"><span class="ic">↩</span> Sign out</a>
 </nav>
@@ -106,6 +107,7 @@
   if (client) document.getElementById('client-name').textContent = client.name;
 
   const initials = n => n.replace(/\s*\(.*\)$/, '').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+  const rates = await ericka.perfRates();
   const board = await ericka.clientBoard(s.client_id);
 
   // hero stats
@@ -145,13 +147,18 @@
   }
   function prodBlock(va) {
     const p = va.productivity;
+    const d = p ? ericka.perfDerived(p, rates) : null;
     return '<div style="margin-top:18px">'
       + '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">'
-      +   '<span style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--grey)">Productivity</span>'
+      +   '<span style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--grey)">Performance</span>'
       +   (p && p.period_label ? '<span style="font-size:11px;color:var(--grey)">' + p.period_label + '</span>' : '')
       + '</div>'
       + (p
-          ? '<div style="display:flex;gap:10px">' + prodBox('Calls', p.calls) + prodBox('Bookings', p.bookings) + prodBox('Payments', p.payments) + '</div>'
+          ? '<div style="display:flex;gap:10px">'
+            + prodBox('Inbound', p.calls_inbound)
+            + prodBox('Booked', (p.cpr_booked||0)+(p.ha_booked||0))
+            + prodBox('Revenue', '$' + Math.round(d.total).toLocaleString())
+            + '</div>'
           : '<div style="font-size:13px;color:var(--grey)">Awaiting team-lead entry (from 3CX / HotDoc / Pracsoft).</div>')
       + '</div>';
   }
@@ -189,31 +196,10 @@
       + '</div>';
   }
 
-  // At-a-glance scoreboard across all the client's VAs.
-  function scoreboardHtml(list) {
-    const rows = list.map(function (va) {
-      const tPct = va.modulesTotal ? Math.round(va.modulesDone/va.modulesTotal*100) : 0;
-      const p = va.productivity;
-      const onboarded = va.onbTotal && va.onbDone === va.onbTotal;
-      const status = onboarded ? '<span class="chip chip-ok">Ready</span>' : '<span class="chip chip-open">In training</span>';
-      return '<tr>'
-        + '<td><div class="who"><div class="avatar' + (va.vertical==='medical'?' gold':'') + '">' + initials(va.name) + '</div>' + va.name + '</div></td>'
-        + '<td>📍 ' + va.site + '</td>'
-        + '<td>' + va.modulesDone + '/' + va.modulesTotal + ' (' + tPct + '%)</td>'
-        + '<td>' + va.capabilities.length + '</td>'
-        + '<td style="text-align:right">' + (p ? p.calls : '—') + '</td>'
-        + '<td style="text-align:right">' + (p ? p.bookings : '—') + '</td>'
-        + '<td>' + status + '</td>'
-        + '</tr>';
-    }).join('');
-    return '<div class="section-h">Performance at a glance <span>your team this week</span></div>'
-      + '<div style="font-size:12px;color:var(--grey);margin:-6px 0 12px">Productivity (calls / bookings) is entered by the team lead from 3CX, HotDoc &amp; Pracsoft.</div>'
-      + '<div class="panel" style="overflow-x:auto"><table>'
-      + '<thead><tr><th>VA</th><th>Site</th><th>Training</th><th>Capabilities</th><th style="text-align:right">Calls</th><th style="text-align:right">Bookings</th><th>Status</th></tr></thead>'
-      + '<tbody>' + rows + '</tbody></table></div>';
-  }
-
-  el.innerHTML = scoreboardHtml(board)
+  el.innerHTML = '<div class="section-h">Performance at a glance <span>your team this week</span></div>'
+    + '<div style="font-size:12px;color:var(--grey);margin:-6px 0 12px">Calls from 3CX · bookings from HotDoc/Pracsoft (entered by the team lead). '
+    + 'CP revenue = Booked × $' + rates.cp_value.toFixed(2) + ' · HA revenue = Booked × $' + rates.ha_value.toFixed(2) + ' · Arrears = $ collected.</div>'
+    + ericka.buildScoreboard(board, rates)
     + '<div class="section-h" style="margin-top:34px">Your team <span>by site</span></div>'
     + sites.map(function (g) {
     return '<div class="site-head"><span class="pin">📍</span>' + g.name
@@ -239,16 +225,21 @@
     const gold = va.vertical === 'medical';
     const rows = checklist(va.modules, 'onboarding', 'Onboarding') + checklist(va.modules, 'training', 'Training');
     const p = va.productivity;
+    const d = p ? ericka.perfDerived(p, rates) : null;
+    const line = (l, v) => '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span style="color:var(--grey)">' + l + '</span><b>' + v + '</b></div>';
+    const money = v => '$' + Math.round(v).toLocaleString();
     const prod = p
-      ? '<div style="display:flex;gap:10px;margin-top:4px">' + prodBox('Calls (3CX)', p.calls) + prodBox('Bookings', p.bookings) + prodBox('Payments', p.payments) + '</div>'
-        + '<div style="font-size:12px;color:var(--grey);margin-top:6px">' + (p.period_label || '')
-        + (p.updated_at ? ' · updated ' + new Date(p.updated_at).toLocaleDateString('en-AU') : '') + '</div>'
+      ? line('Inbound calls', p.calls_inbound) + line('Scans', p.scans) + line('Confirmation calls', p.confirmation_calls)
+        + line('Arrears collected', money(d.arrears)) + line('Care plans booked', p.cpr_booked + ' (' + money(d.cprRev) + ')')
+        + line('Health assessments booked', p.ha_booked + ' (' + money(d.haRev) + ')')
+        + '<div style="display:flex;justify-content:space-between;font-size:14px;padding:8px 0 0;margin-top:6px;border-top:1px solid var(--line)"><b>Total revenue</b><b style="color:var(--gold-text)">' + money(d.total) + '</b></div>'
+        + '<div style="font-size:12px;color:var(--grey);margin-top:6px">' + (p.period_label || '') + (p.updated_at ? ' · updated ' + new Date(p.updated_at).toLocaleDateString('en-AU') : '') + '</div>'
       : '<span style="font-size:13px;color:var(--grey)">Awaiting team-lead entry (from 3CX / HotDoc / Pracsoft).</span>';
     document.getElementById('modal-body').innerHTML = ''
       + '<div class="who" style="margin-bottom:4px"><div class="avatar' + (gold?' gold':'') + '">' + initials(va.name) + '</div><b style="font-size:18px">' + va.name + '</b></div>'
       + '<div style="font-size:13px;color:var(--grey);margin-bottom:6px">' + (gold?'🩺 Medical':'🦷 Dental') + ' · 📍 ' + va.site + ' · ' + va.modulesDone + ' of ' + va.modulesTotal + ' modules complete</div>'
       + rows
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin:20px 0 6px">Productivity</div>'
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin:20px 0 6px">Performance</div>'
       + prod;
     document.getElementById('va-modal').style.display = 'flex';
   }

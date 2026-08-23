@@ -10,6 +10,7 @@ const FILES = [
   'migration_03_content.sql',
   'migration_04_quizzes.sql',
   'migration_05_productivity.sql',
+  'migration_06_scorecard.sql',
 ];
 
 (async () => {
