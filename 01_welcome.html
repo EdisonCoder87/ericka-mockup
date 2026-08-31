@@ -52,7 +52,7 @@
   const { data: users, error } = await sb.from('users')
     .select('name,role').eq('active', true).order('role').order('name');
   if (!error && users) {
-    const labelRole = { admin: 'Admin', team_lead: 'Team Lead', client_admin: 'Client', va: 'VA' };
+    const labelRole = { admin: 'Admin', manager: 'Ericka Manager', team_lead: 'Team Lead', client_admin: 'Client', va: 'VA' };
     users.forEach(function (u) {
       const o = document.createElement('option');
       o.value = u.name;

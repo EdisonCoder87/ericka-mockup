@@ -4,7 +4,10 @@ const fs = require('fs');
 
 const REF = 'bewfcqcmleuznaaptqiq';               // ericka-portal project ref
 const PAT = process.env.SUPABASE_PAT;
-const FILES = [
+// Default = the full ordered set. Pass filenames as CLI args to run only those,
+// e.g.  SUPABASE_PAT=sbp_xxx node run_migrations.js migration_07_real_team.sql
+// (Do NOT re-run 05/06 once real data exists — they DROP the productivity table.)
+const DEFAULT_FILES = [
   'migration_01_sites.sql',
   'migration_02_structure.sql',
   'migration_03_content.sql',
@@ -12,6 +15,7 @@ const FILES = [
   'migration_05_productivity.sql',
   'migration_06_scorecard.sql',
 ];
+const FILES = process.argv.slice(2).length ? process.argv.slice(2) : DEFAULT_FILES;
 
 (async () => {
   if (!PAT) { console.error('Missing SUPABASE_PAT env var'); process.exit(1); }

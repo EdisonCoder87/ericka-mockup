@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Ericka Team Portal</title>
+<link rel="stylesheet" href="ericka.css">
+<style>
+  .admin-grid{display:grid;gap:18px}
+  .fld{display:block;margin-bottom:12px}
+  .fld label{display:block;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--grey);margin-bottom:5px}
+  .fld input,.fld select{width:100%;padding:11px 12px}
+  .row-flex{display:flex;gap:12px;flex-wrap:wrap}
+  .row-flex .fld{flex:1;min-width:150px;margin-bottom:0}
+  .mtbl{width:100%;border-collapse:collapse;font-size:14px}
+  .mtbl th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--grey);font-weight:700;padding:8px 10px;border-bottom:1px solid var(--line)}
+  .mtbl td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
+  .mtbl tr.off td{opacity:.5}
+  .mtbl select{padding:7px 9px;font-size:13px}
+  .rowbtn{padding:6px 12px;font-size:12.5px;font-weight:700;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;color:var(--ink)}
+  .rowbtn:hover{border-color:var(--violet);color:var(--violet)}
+  .rowbtn.danger:hover{border-color:var(--danger);color:var(--danger)}
+  .flash{font-size:12px;font-weight:700;color:var(--ok);margin-left:8px}
+  .msg-ok{color:var(--ok)}.msg-err{color:var(--danger)}
+  @media(max-width:640px){
+    .mtbl thead{display:none}
+    .mtbl,.mtbl tbody,.mtbl tr,.mtbl td{display:block;width:100%}
+    .mtbl tr{border:1px solid var(--line);border-radius:12px;margin-bottom:12px;padding:6px}
+    .mtbl td{border:none;padding:6px 10px}
+    .mtbl td::before{content:attr(data-l);display:block;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--grey);font-weight:700;margin-bottom:2px}
+  }
+</style>
+</head>
+<body>
+
+<input type="checkbox" id="navtog">
+<div class="app-topbar">
+  <label class="burger" for="navtog"><span></span><span></span><span></span></label>
+  <div class="wm rev">Erick<span class="a">a</span></div>
+</div>
+
+<nav class="app-sidebar">
+  <div class="sidebar-brand">
+    <div class="wm rev">Erick<span class="a">a</span></div>
+    <svg class="pulse" viewBox="0 0 90 14" preserveAspectRatio="none"><path d="M2 7 H32 l4 -5 l5 10 l4 -8 l3 3 H88"/></svg>
+  </div>
+  <div class="nav-group-label">Manage</div>
+  <a id="nav-home" href="02_home.html"><span class="ic">🏠</span> Home</a>
+  <a href="10_team.html"><span class="ic">👥</span> Team</a>
+  <a href="performance.html"><span class="ic">📊</span> Performance</a>
+  <a href="11_admin.html" class="active"><span class="ic">⚙️</span> Admin</a>
+  <a href="01_welcome.html" class="logout" onclick="ericka.logout();return false;"><span class="ic">↩</span> Sign out</a>
+</nav>
+
+<div class="page">
+  <div class="hero">
+    <div class="hero-inner">
+      <div class="hero-left">
+        <div class="hero-label">Admin &amp; access</div>
+        <h1 class="hero-name">Manage the team</h1>
+        <p class="hero-tagline">Onboard remote team members, assign their clinic and reset PINs.</p>
+      </div>
+      <div class="hero-right">
+        <div class="stat"><div class="v" id="s-count">–</div><div class="l">Members</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <!-- Add member -->
+    <div class="section-h">Add a team member <span>onboard someone new</span></div>
+    <div class="panel" style="padding:22px;margin-bottom:26px">
+      <form id="add-form">
+        <div class="row-flex" style="margin-bottom:12px">
+          <div class="fld"><label for="m-name">Full name</label>
+            <input id="m-name" type="text" placeholder="e.g. Maria Santos" autocomplete="off"></div>
+          <div class="fld"><label for="m-site">Clinic</label>
+            <select id="m-site"></select></div>
+          <div class="fld"><label for="m-pin">Starting PIN</label>
+            <input id="m-pin" type="text" inputmode="numeric" placeholder="4–6 digits" autocomplete="off"></div>
+        </div>
+        <div class="row-flex" id="rate-row" style="display:none;margin-bottom:12px">
+          <div class="fld"><label for="m-bill">Billable rate ($/hr)</label>
+            <input id="m-bill" type="number" step="0.01" min="0" value="0"></div>
+          <div class="fld"><label for="m-pay">Pay rate ($/hr)</label>
+            <input id="m-pay" type="number" step="0.01" min="0" value="0"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <button type="submit" class="btn btn-primary" style="padding:12px 26px">Add member</button>
+          <span id="add-msg" style="font-size:13px;font-weight:700"></span>
+        </div>
+      </form>
+    </div>
+
+    <!-- Members list -->
+    <div class="section-h">Remote team members <span>reassign clinic · reset PIN · activate</span></div>
+    <div class="panel" style="padding:16px;overflow-x:auto;margin-bottom:26px">
+      <table class="mtbl">
+        <thead><tr><th>Name</th><th>Clinic</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="mrows"><tr><td colspan="4" style="color:var(--grey)">Loading…</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- Change my PIN -->
+    <div class="section-h">Your account <span>keep your PIN private</span></div>
+    <div class="panel" style="padding:22px;max-width:420px">
+      <div class="fld"><label for="my-pin">New PIN for <b id="my-name"></b></label>
+        <input id="my-pin" type="text" inputmode="numeric" placeholder="4–6 digits" autocomplete="off"></div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <button id="my-save" class="btn btn-ghost" style="padding:11px 22px">Change my PIN</button>
+        <span id="my-msg" style="font-size:13px;font-weight:700"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+(async function () {
+  if (!ericka.ready()) return;
+  const s = ericka.requireRole(['admin','manager']);
+  if (!s) return;
+  const isAdmin = s.role === 'admin';
+  document.getElementById('nav-home').href = ericka.homeFor(s.role);
+  document.getElementById('my-name').textContent = s.name;
+
+  // clinic dropdowns
+  const clinicOpts = '<option value="">— Select clinic —</option>'
+    + ericka.CLINICS.map(c => '<option value="' + c + '">' + c + '</option>').join('');
+  document.getElementById('m-site').innerHTML = clinicOpts;
+
+  // owner sees rate fields; managers never do
+  if (isAdmin) document.getElementById('rate-row').style.display = 'flex';
+
+  const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c =>
+    ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+  const flash = (el, ok, txt) => { el.className = ok ? 'msg-ok' : 'msg-err'; el.textContent = txt; };
+
+  let members = [];
+  async function refresh() {
+    members = await ericka.listMembers();
+    document.getElementById('s-count').textContent =
+      members.filter(m => m.active).length;
+    const tb = document.getElementById('mrows');
+    if (!members.length) {
+      tb.innerHTML = '<tr><td colspan="4" style="color:var(--grey)">No members yet — add your first above.</td></tr>';
+      return;
+    }
+    tb.innerHTML = members.map(function (m) {
+      const opts = '<option value="">— Unassigned —</option>' + ericka.CLINICS.map(c =>
+        '<option value="' + c + '"' + (c === m.site ? ' selected' : '') + '>' + c + '</option>').join('');
+      return '<tr class="' + (m.active ? '' : 'off') + '" data-id="' + m.id + '">'
+        + '<td data-l="Name"><b>' + esc(m.name) + '</b></td>'
+        + '<td data-l="Clinic"><select class="js-site">' + opts + '</select><span class="flash js-siteflash"></span></td>'
+        + '<td data-l="Status">' + (m.active
+              ? '<span class="chip chip-ok">Active</span>'
+              : '<span class="chip chip-open">Inactive</span>') + '</td>'
+        + '<td data-l="Actions">'
+        +   '<button class="rowbtn js-pin">Reset PIN</button> '
+        +   '<button class="rowbtn danger js-active">' + (m.active ? 'Deactivate' : 'Reactivate') + '</button>'
+        + '</td></tr>';
+    }).join('');
+
+    tb.querySelectorAll('tr[data-id]').forEach(function (tr) {
+      const id = tr.dataset.id;
+      const m  = members.find(x => x.id === id);
+      // reassign clinic
+      tr.querySelector('.js-site').addEventListener('change', async function () {
+        const fl = tr.querySelector('.js-siteflash');
+        try { await ericka.updateMember(id, { site: this.value });
+              m.site = this.value; fl.className = 'flash'; fl.textContent = 'Saved ✓';
+              setTimeout(() => fl.textContent = '', 1800); }
+        catch (e) { fl.className = 'flash msg-err'; fl.textContent = 'Failed'; }
+      });
+      // reset pin
+      tr.querySelector('.js-pin').addEventListener('click', async function () {
+        const np = prompt('New PIN for ' + m.name + ' (4–6 digits):');
+        if (np == null) return;
+        try { await ericka.resetPin(id, np.trim()); alert('PIN updated for ' + m.name + '.'); }
+        catch (e) { alert('Could not reset PIN: ' + (e.message || e)); }
+      });
+      // activate / deactivate
+      tr.querySelector('.js-active').addEventListener('click', async function () {
+        const goActive = !m.active;
+        if (!goActive && !confirm('Deactivate ' + m.name + '? They will no longer be able to sign in.')) return;
+        try { await ericka.updateMember(id, { active: goActive }); await refresh(); }
+        catch (e) { alert('Could not update: ' + (e.message || e)); }
+      });
+    });
+  }
+
+  // add member
+  document.getElementById('add-form').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const msg = document.getElementById('add-msg');
+    const payload = {
+      name: document.getElementById('m-name').value,
+      site: document.getElementById('m-site').value,
+      pin:  document.getElementById('m-pin').value,
+      role: 'va', vertical: 'medical'
+    };
+    if (isAdmin) {
+      payload.billable_rate = parseFloat(document.getElementById('m-bill').value) || 0;
+      payload.pay_rate      = parseFloat(document.getElementById('m-pay').value) || 0;
+    }
+    try {
+      const created = await ericka.createMember(payload);
+      flash(msg, true, created.name + ' added ✓');
+      document.getElementById('add-form').reset();
+      document.getElementById('m-site').innerHTML = clinicOpts;
+      if (isAdmin) { document.getElementById('m-bill').value = 0; document.getElementById('m-pay').value = 0; }
+      await refresh();
+    } catch (ex) { flash(msg, false, ex.message || String(ex)); }
+  });
+
+  // change my pin
+  document.getElementById('my-save').addEventListener('click', async function () {
+    const msg = document.getElementById('my-msg');
+    const np = document.getElementById('my-pin').value.trim();
+    try {
+      await ericka.changeMyPin(s.id, np);
+      const fresh = Object.assign({}, s, {}); // session pin isn't stored; nothing to update
+      flash(msg, true, 'PIN changed ✓');
+      document.getElementById('my-pin').value = '';
+    } catch (ex) { flash(msg, false, ex.message || String(ex)); }
+  });
+
+  await refresh();
+})();
+</script>
+</body>
+</html>

@@ -32,13 +32,14 @@
 <script>
 (async function () {
   if (!ericka.ready()) return;
-  const s = ericka.requireRole(['va','team_lead','admin','client_admin']);
+  const s = ericka.requireRole(['va','team_lead','admin','client_admin','manager']);
   if (!s) return;
   document.getElementById('back').href = ericka.homeFor(s.role);
 
   const rates = await ericka.perfRates();
-  // VAs & the client see their own client's team; managers see everyone.
-  const list = (s.role === 'admin' || s.role === 'team_lead')
+  // Admin / team lead / Ericka manager see the whole team; a VA & the client
+  // admin see only their own client's team.
+  const list = (s.role === 'admin' || s.role === 'team_lead' || s.role === 'manager')
     ? await ericka.teamBoard()
     : await ericka.clientBoard(s.client_id);
 

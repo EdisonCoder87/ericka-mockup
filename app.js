@@ -18,10 +18,18 @@
   // Home page for each role
   function homeFor(role) {
     if (role === "admin")        return "02_home.html";
+    if (role === "manager")      return "10_team.html";   // Ericka Manager (Shane/Sharica)
     if (role === "team_lead")    return "10_team.html";
     if (role === "client_admin") return "08_client_home.html";
     return "05_va_home.html"; // va
   }
+
+  /* ---- reference data --------------------------------------------------- */
+  // SIA Medical's clinics — the clinic-assignment options for a remote member.
+  const CLINICS = ["Box Hill","Burwood","Croydon","Essendon","Footscray",
+                   "Moonee Ponds","Montrose","Mulgrave","Berwick"];
+  // Only medical client today; a member onboarded via the admin page belongs here.
+  const SIA_MEDICAL_CLIENT_ID = "11111111-1111-1111-1111-111111111111";
 
   // Guard a page. Pass allowed roles, e.g. requireRole(['va']).
   function requireRole(roles) {
@@ -376,8 +384,62 @@
     };
   }
 
+  /* ---- admin: member management (admin + Ericka manager) ---------------- */
+  // Every remote team member (role = va), for the admin page. Never selects
+  // pay_rate — managers must not see pay economics. Newest first.
+  async function listMembers() {
+    const { data, error } = await sb.from("users")
+      .select("id,name,role,site,vertical,active,created_at")
+      .eq("role", "va")
+      .order("active", { ascending: false })
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+
+  // Onboard a new remote team member. Managers create VAs at rate 0 (pay
+  // economics stay with the owner); admin may pass billable/pay explicitly.
+  async function createMember(m) {
+    const row = {
+      name: (m.name || "").trim(),
+      pin: String(m.pin || "").trim(),
+      role: m.role || "va",
+      client_id: m.clientId || SIA_MEDICAL_CLIENT_ID,
+      vertical: m.vertical || "medical",
+      site: m.site || null,
+      billable_rate: m.billable_rate || 0,
+      pay_rate: m.pay_rate || 0,
+      active: true
+    };
+    if (!row.name)            throw new Error("Name is required.");
+    if (!/^\d{4,6}$/.test(row.pin)) throw new Error("PIN must be 4–6 digits.");
+    const { data, error } = await sb.from("users").insert(row).select("id,name").single();
+    if (error) throw error;
+    return data;
+  }
+
+  // Reassign clinic / activate-deactivate a member.
+  async function updateMember(userId, fields) {
+    const patch = {};
+    if ("site"   in fields) patch.site   = fields.site || null;
+    if ("active" in fields) patch.active = !!fields.active;
+    const { error } = await sb.from("users").update(patch).eq("id", userId);
+    if (error) throw error;
+  }
+
+  // Reset any member's PIN (admin/manager), or your own ("Change my PIN").
+  async function resetPin(userId, newPin) {
+    const pin = String(newPin || "").trim();
+    if (!/^\d{4,6}$/.test(pin)) throw new Error("PIN must be 4–6 digits.");
+    const { error } = await sb.from("users").update({ pin }).eq("id", userId);
+    if (error) throw error;
+  }
+  const changeMyPin = resetPin;   // same operation, scoped to the caller's id
+
   /* ---- expose ----------------------------------------------------------- */
   window.ericka = {
+    CLINICS, SIA_MEDICAL_CLIENT_ID,
+    listMembers, createMember, updateMember, resetPin, changeMyPin,
     session, setSession, logout, requireRole, homeFor, login,
     weekStart, hoursBetween,
     openShift, clockIn, clockOut, weekShifts, sumHours,

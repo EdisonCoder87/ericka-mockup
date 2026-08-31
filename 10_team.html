@@ -43,6 +43,7 @@
   <a id="nav-home" href="02_home.html"><span class="ic">🏠</span> Home</a>
   <a href="10_team.html" class="active"><span class="ic">👥</span> Team</a>
   <a href="performance.html"><span class="ic">📊</span> Performance</a>
+  <a id="nav-admin" href="11_admin.html" style="display:none"><span class="ic">⚙️</span> Admin</a>
   <a href="01_welcome.html" class="logout" onclick="ericka.logout();return false;"><span class="ic">↩</span> Sign out</a>
 </nav>
 
@@ -81,9 +82,11 @@
 <script>
 (async function () {
   if (!ericka.ready()) return;
-  const s = ericka.requireRole(['admin','team_lead']);
+  const s = ericka.requireRole(['admin','team_lead','manager']);
   if (!s) return;
   document.getElementById('nav-home').href = ericka.homeFor(s.role);
+  if (s.role === 'admin' || s.role === 'manager')
+    document.getElementById('nav-admin').style.display = '';
 
   const initials = n => n.replace(/\s*\(.*\)$/, '').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
   const board = await ericka.teamBoard();
