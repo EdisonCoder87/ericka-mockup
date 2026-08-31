@@ -16,20 +16,29 @@ GitHub Pages**.
 
 ## Status
 - [x] **Step 1 — CNAME file** added (`CNAME` = `portal.ericka.com.au`) and pushed to `main`.
-- [ ] **Step 2 — DNS record** at VentraIP (below).
+- [ ] **Step 2 — DNS record** at Cloudflare (below).
 - [ ] **Step 3 — Custom domain** turned on in GitHub → Settings → Pages + Enforce HTTPS.
+
+> **Where DNS lives:** `ericka.com.au`'s **registrar is Crazy Domains**, but its **DNS is
+> managed at Cloudflare** (nameservers were switched to Cloudflare on 2026-07-31 — that's how the
+> main site + Zoho email run). So the record below is added **at Cloudflare, NOT VentraIP and NOT
+> Crazy Domains.**
 
 ---
 
-## Step 2 — Add the DNS record at VentraIP
-VentraIP → `ericka.com.au` → **Manage DNS** (a.k.a. "DNS Zone Editor") → add:
+## Step 2 — Add the DNS record at Cloudflare
+dash.cloudflare.com → select **`ericka.com.au`** → **DNS → Records → Add record**:
 
 | Field | Value |
 |---|---|
 | Type | `CNAME` |
-| Host / Name | `portal` (just the word, not the full domain) |
-| Points to / Value / Target | `edisoncoder87.github.io` (no `https://`, no trailing slash) |
-| TTL | default (or `3600`) |
+| Name | `portal` (just the word, not the full domain) |
+| Target | `edisoncoder87.github.io` (no `https://`, no trailing slash) |
+| **Proxy status** | **DNS only — GREY cloud** (click the orange cloud to grey it) |
+| TTL | Auto |
+
+⚠️ **Must be grey cloud / "DNS only."** If left orange (proxied), Cloudflare fights GitHub Pages
+over SSL → "not secure" errors / redirect loops. Grey cloud lets GitHub issue its own free cert.
 
 This touches **only** the `portal` subdomain — it does NOT affect the main `ericka.com.au`
 website or Zoho email.
