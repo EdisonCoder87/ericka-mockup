@@ -195,11 +195,14 @@
   document.getElementById('add-form').addEventListener('submit', async function (e) {
     e.preventDefault();
     const msg = document.getElementById('add-msg');
+    const site = document.getElementById('m-site').value;
     const payload = {
       name: document.getElementById('m-name').value,
-      site: document.getElementById('m-site').value,
+      site: site,
       pin:  document.getElementById('m-pin').value,
-      role: 'va', vertical: 'medical'
+      role: 'va', vertical: 'medical',
+      // General VAs aren't tied to a clinic client; clinic VAs → SIA Medical.
+      clientId: (site === ericka.GENERAL_VA) ? null : ericka.SIA_MEDICAL_CLIENT_ID
     };
     if (isAdmin) {
       payload.billable_rate = parseFloat(document.getElementById('m-bill').value) || 0;

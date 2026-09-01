@@ -25,10 +25,13 @@
   }
 
   /* ---- reference data --------------------------------------------------- */
-  // SIA Medical's clinics — the clinic-assignment options for a remote member.
+  // Assignment options for a remote member: SIA Medical's 9 clinics, plus
+  // "General VA" for members not tied to a clinic (e.g. an owner's own VA).
+  const GENERAL_VA = "General VA";
   const CLINICS = ["Box Hill","Burwood","Croydon","Essendon","Footscray",
-                   "Moonee Ponds","Montrose","Mulgrave","Berwick"];
-  // Only medical client today; a member onboarded via the admin page belongs here.
+                   "Moonee Ponds","Montrose","Mulgrave","Berwick", GENERAL_VA];
+  // Only medical client today; a clinic member belongs here. A General VA has
+  // no client (client_id null) — they don't appear on any client's board.
   const SIA_MEDICAL_CLIENT_ID = "11111111-1111-1111-1111-111111111111";
 
   // Guard a page. Pass allowed roles, e.g. requireRole(['va']).
@@ -404,7 +407,8 @@
       name: (m.name || "").trim(),
       pin: String(m.pin || "").trim(),
       role: m.role || "va",
-      client_id: m.clientId || SIA_MEDICAL_CLIENT_ID,
+      // explicit null = General VA (no client); undefined = default to SIA Medical
+      client_id: (m.clientId === undefined ? SIA_MEDICAL_CLIENT_ID : m.clientId),
       vertical: m.vertical || "medical",
       site: m.site || null,
       billable_rate: m.billable_rate || 0,
@@ -438,7 +442,7 @@
 
   /* ---- expose ----------------------------------------------------------- */
   window.ericka = {
-    CLINICS, SIA_MEDICAL_CLIENT_ID,
+    CLINICS, GENERAL_VA, SIA_MEDICAL_CLIENT_ID,
     listMembers, createMember, updateMember, resetPin, changeMyPin,
     session, setSession, logout, requireRole, homeFor, login,
     weekStart, hoursBetween,
