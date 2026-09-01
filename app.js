@@ -34,6 +34,15 @@
   // no client (client_id null) — they don't appear on any client's board.
   const SIA_MEDICAL_CLIENT_ID = "11111111-1111-1111-1111-111111111111";
 
+  // A General VA (owner's own VA, no clinic) has NO KPI/performance dashboard.
+  // Works for a session (role va + no client) or a board row (site tag).
+  // Owners/managers/clients also lack a client_id, so the role check matters.
+  function isGeneralVA(u) {
+    if (!u) return false;
+    if (u.site === GENERAL_VA) return true;
+    return u.role === "va" && !u.client_id;
+  }
+
   // Guard a page. Pass allowed roles, e.g. requireRole(['va']).
   function requireRole(roles) {
     const s = session();
@@ -442,7 +451,7 @@
 
   /* ---- expose ----------------------------------------------------------- */
   window.ericka = {
-    CLINICS, GENERAL_VA, SIA_MEDICAL_CLIENT_ID,
+    CLINICS, GENERAL_VA, SIA_MEDICAL_CLIENT_ID, isGeneralVA,
     listMembers, createMember, updateMember, resetPin, changeMyPin,
     session, setSession, logout, requireRole, homeFor, login,
     weekStart, hoursBetween,

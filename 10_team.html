@@ -234,11 +234,13 @@
       + '<div style="font-size:13px;color:var(--grey);margin-bottom:6px">' + va.client + ' · 📍 ' + va.site + ' · ' + (gold?'Medical':'Dental') + '</div>'
       + checklist(va.modules, 'onboarding')
       + checklist(va.modules, 'training')
-      + prodForm(va);
+      + (ericka.isGeneralVA(va)
+          ? '<div style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px;font-size:13px;color:var(--grey)">General VA — no performance tracking.</div>'
+          : prodForm(va));
     document.getElementById('va-modal').style.display = 'flex';
 
     const save = document.getElementById('p-save');
-    save.onclick = async function () {
+    if (save) save.onclick = async function () {
       save.disabled = true; save.textContent = 'Saving…';
       const val = f => {
         const raw = document.getElementById('p-' + f).value;

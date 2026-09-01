@@ -23,7 +23,7 @@
   <a href="05_va_home.html"><span class="ic">🏠</span> Home</a>
   <a href="06_va_training.html"><span class="ic">🎓</span> My Training</a>
   <a href="07_va_timesheet.html" class="active"><span class="ic">🕑</span> My Timesheet</a>
-  <a href="performance.html"><span class="ic">📊</span> Performance</a>
+  <a id="nav-perf" href="performance.html"><span class="ic">📊</span> Performance</a>
   <a id="nav-cheat" href="cheatsheet.html" style="display:none"><span class="ic">📇</span> <span class="cs-site">Cheat Sheet</span></a>
   <a href="01_welcome.html" class="logout" onclick="ericka.logout();return false;"><span class="ic">↩</span> Sign out</a>
 </nav>
@@ -89,6 +89,7 @@
   const s = ericka.requireRole(['va']);
   if (!s) return;
   ericka.revealCheatsheetNav(s);
+  if (ericka.isGeneralVA(s)) document.getElementById('nav-perf').style.display = 'none';
 
   const { data: client } = await sb.from('clients').select('name').eq('id', s.client_id).maybeSingle();
   const clientName = client ? client.name : '';
