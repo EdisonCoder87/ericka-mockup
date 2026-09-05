@@ -156,11 +156,27 @@
   function sumHours(shifts) {
     return shifts.reduce((t, s) => t + (s.clock_out ? hoursBetween(s.clock_in, s.clock_out) : 0), 0);
   }
+  // Nobody forgets to clock out for only a few minutes. Without a cap, a VA who
+  // clocked in on Monday and never clocked out shows the client "on the phones
+  // since 9:00am" two days later with 50 hours against a 38-hour roster.
+  const MAX_OPEN_SHIFT_H = 12;    // hours of an open shift we're willing to count
+  const STALE_OPEN_SHIFT_H = 16;  // beyond this, they are not "on now", just adrift
+
+  // Hours one shift contributes: closed shifts as recorded, open shifts capped.
+  function shiftHours(s, nowIso) {
+    if (s.clock_out) return hoursBetween(s.clock_in, s.clock_out);
+    return Math.min(MAX_OPEN_SHIFT_H, hoursBetween(s.clock_in, nowIso));
+  }
+  // Is this open shift plausibly someone actually on the phones right now?
+  function isLiveShift(s) {
+    return !!s && !s.clock_out
+      && hoursBetween(s.clock_in, new Date().toISOString()) <= STALE_OPEN_SHIFT_H;
+  }
   // Hours worked so far INCLUDING an open shift, counted up to now. This is
   // the honest "hours this week" figure to show against a roster.
   function sumHoursLive(shifts) {
     const now = new Date().toISOString();
-    return shifts.reduce((t, s) => t + hoursBetween(s.clock_in, s.clock_out || now), 0);
+    return shifts.reduce((t, s) => t + shiftHours(s, now), 0);
   }
   // Hours per day, index 0 = Monday … 6 = Sunday. Drives the coverage bars.
   function hoursByDay(shifts) {
@@ -168,12 +184,12 @@
     const now = new Date().toISOString();
     shifts.forEach(function (s) {
       const d = new Date(s.clock_in);
-      out[(d.getDay() + 6) % 7] += hoursBetween(s.clock_in, s.clock_out || now);
+      out[(d.getDay() + 6) % 7] += shiftHours(s, now);
     });
     return out;
   }
-  // The currently-open shift in a set, if any.
-  function openIn(shifts) { return shifts.find(s => !s.clock_out) || null; }
+  // The currently-open shift in a set — only if it's fresh enough to believe.
+  function openIn(shifts) { return shifts.find(isLiveShift) || null; }
   // Most recent clock-out in a set, if any.
   function lastOutIn(shifts) {
     const done = shifts.filter(s => s.clock_out)
@@ -255,10 +271,16 @@
     (data || []).forEach(r => out.get(r.user_id).set(r.module_id, r));
     return out;
   }
+  // Is this a plain web link we're willing to store and render as an anchor?
+  // Anything else is shown as text — the value reaches a manager's browser and
+  // the database has no column-level guard until RLS lands.
+  function isSafeUrl(u) {
+    return typeof u === "string" && /^https?:\/\/[^\s"'<>`]+$/i.test(u);
+  }
   // A member submits the practical for a module that requires evidence.
   async function submitEvidence(userId, moduleId, url) {
     const link = String(url || "").trim();
-    if (!/^https?:\/\/\S+$/i.test(link)) throw new Error("Paste a full link starting with http:// or https://");
+    if (!isSafeUrl(link)) throw new Error("Paste a plain link starting with http:// or https://");
     const { error } = await sb.from("training_progress")
       .update({ evidence_url: link, verified_by: null, verified_at: null })
       .eq("user_id", userId).eq("module_id", moduleId);
@@ -352,8 +374,10 @@
       updated_at: new Date().toISOString()
     };
     PROD_FIELDS.forEach(f => { row[f] = p[f] || 0; });
+    // Conflict on the week, not its label: a label is display text and can be
+    // re-typed, which would otherwise create a second row for the same week.
     const { error } = await sb.from("productivity")
-      .upsert(row, { onConflict: "user_id,period_label" });
+      .upsert(row, { onConflict: "user_id,period_start" });
     if (error) throw error;
   }
 
@@ -472,8 +496,11 @@
   // Calls answered as a share of calls offered. The most credible single
   // number an owner gets, because it comes off the phone system.
   function answerRate(p) {
-    if (!p) return null;
-    const ans = Number(p.calls_inbound || 0), miss = Number(p.calls_missed || 0);
+    // calls_missed is null on any week entered before it existed. A missing
+    // value is NOT zero — reporting 100% off a blank would fabricate the most
+    // credible number on the page.
+    if (!p || p.calls_missed == null) return null;
+    const ans = Number(p.calls_inbound || 0), miss = Number(p.calls_missed);
     if (!ans && !miss) return null;
     return ans / (ans + miss);
   }
@@ -744,6 +771,7 @@
       const hours = sumHoursLive(shifts);
       const hist = historyAll.get(va.id) || [];
       const prod = hist.length ? hist[0] : null;
+      // full history so the entry form can load whichever week is selected
       out.push(Object.assign(
         vaProgress(modsCache[va.vertical], new Set(rows.keys()), rows),
         {
@@ -755,6 +783,7 @@
           rostered: Number(va.rostered_hours || 0),
           hours: hours,
           pace: paceFor(hours, va.rostered_hours),
+          history: hist,
           productivity: prod
         }
       ));
@@ -856,6 +885,7 @@
     session, setSession, logout, requireRole, homeFor, login,
     weekStart, mondayOf, weekLabelFor, hoursBetween, weekProgress, paceFor,
     openShift, clockIn, clockOut, weekShifts, weekShiftsForMany, sumHours, sumHoursLive,
+    shiftHours, isLiveShift, isSafeUrl,
     hoursByDay, openIn, lastOutIn,
     modulesFor, moduleWithSections, progressFor, progressRowsFor, progressRowsForMany,
     completeModule, quizFor, submitEvidence, verifyEvidence, AI_TIERS,

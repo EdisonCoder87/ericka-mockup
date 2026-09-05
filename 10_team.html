@@ -213,8 +213,11 @@
           const ok = !!m.verifiedAt;
           return '<div style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px">'
             + '<div style="font-size:13px;font-weight:700">' + esc(m.title) + '</div>'
-            + '<a href="' + esc(m.evidenceUrl) + '" target="_blank" rel="noopener" '
-            +   'style="font-size:12px;color:var(--violet);word-break:break-all">' + esc(m.evidenceUrl) + '</a>'
+            + (ericka.isSafeUrl(m.evidenceUrl)
+                ? '<a href="' + esc(m.evidenceUrl) + '" target="_blank" rel="noopener noreferrer" '
+                  + 'style="font-size:12px;color:var(--violet);word-break:break-all">' + esc(m.evidenceUrl) + '</a>'
+                : '<div style="font-size:12px;color:var(--danger);word-break:break-all">Not a valid link — '
+                  + esc(m.evidenceUrl) + '</div>')
             + '<div style="display:flex;align-items:center;gap:10px;margin-top:8px">'
             +   '<button class="btn ' + (ok ? 'btn-ghost' : 'btn-primary') + ' js-verify" data-mod="' + m.id + '" data-ok="' + (ok?'0':'1') + '" style="padding:8px 16px;font-size:13px">'
             +     (ok ? 'Undo sign-off' : 'Verify & certify') + '</button>'
@@ -253,28 +256,38 @@
   function subHead(t) {
     return '<div style="font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--violet);margin:14px 0 6px">' + t + '</div>';
   }
+  // The week's existing figures, if that week has been entered before.
+  function rowForWeek(va, dateStr) {
+    return (va.history || []).find(r => r.period_start === dateStr) || null;
+  }
   // The entry form is generated from the vertical's metric set — a dental
   // clinic never sees Care Plan Review, and a GP never sees recalls.
+  function prodFields(va, p) {
+    p = p || {};
+    return ericka.metricSet(va.vertical).groups.map(function (g) {
+      return subHead(g.name) + '<div style="display:flex;gap:10px;flex-wrap:wrap">'
+        + g.fields.map(f => numField('p-' + f.k, f.label, f.hint, p[f.k])).join('') + '</div>';
+    }).join('');
+  }
   function prodForm(va) {
-    const p = va.productivity || {};
     const set = ericka.metricSet(va.vertical);
-    const wk = p.period_start ? new Date(p.period_start + 'T00:00:00') : lastMonday();
+    // Default to the last COMPLETED week — the reports are retroactive. Never
+    // pre-fill the previous week's numbers under a new week's heading: saving
+    // that would silently overwrite the week it came from.
+    const wk = lastMonday();
+    const p = rowForWeek(va, toDateInput(wk)) || {};
     return '<div style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px">'
       + '<div class="mini" style="margin-bottom:8px">' + set.label + ' performance — ' + set.source + ' (revenue auto-calculates)</div>'
       + '<label style="font-size:11px;font-weight:700;color:var(--grey)">Week starting (Monday)</label>'
       + '<input id="p-week" type="date" value="' + toDateInput(wk) + '" style="padding:9px 11px">'
       + '<div id="p-weeklabel" style="font-size:11px;color:var(--grey);margin-top:4px"></div>'
-      + set.groups.map(function (g) {
-          return subHead(g.name) + '<div style="display:flex;gap:10px;flex-wrap:wrap">'
-            + g.fields.map(f => numField('p-' + f.k, f.label, f.hint, p[f.k])).join('') + '</div>';
-        }).join('')
+      + '<div id="p-fields">' + prodFields(va, p) + '</div>'
       + '<label style="font-size:11px;font-weight:700;color:var(--grey);margin-top:12px;display:block">Notes (optional)</label>'
       + '<input id="p-notes" value="' + esc(p.notes || '') + '" style="padding:9px 11px">'
       + '<div style="display:flex;align-items:center;gap:12px;margin-top:14px">'
       +   '<button id="p-save" class="btn btn-primary" style="padding:11px 24px">Save performance</button>'
       +   '<span id="p-msg" style="font-size:13px;color:var(--ok);font-weight:700"></span>'
       + '</div>'
-      + (p.updated_at ? '<div style="font-size:11px;color:var(--grey);margin-top:8px">Last updated ' + new Date(p.updated_at).toLocaleString('en-AU') + '</div>' : '')
       + '</div>';
   }
 
@@ -322,12 +335,21 @@
     // performance entry
     const wkInput = document.getElementById('p-week');
     const wkLabel = document.getElementById('p-weeklabel');
-    function refreshWeekLabel() {
+    function loadWeek() {
       if (!wkInput || !wkLabel) return;
       const d = new Date(wkInput.value + 'T00:00:00');
-      wkLabel.textContent = isNaN(d) ? '' : 'Saved as "' + ericka.weekLabelFor(d) + '"';
+      if (isNaN(d)) { wkLabel.textContent = ''; return; }
+      const key = toDateInput(ericka.mondayOf(d));
+      const row = rowForWeek(va, key);
+      // Repopulate from the week now selected — a blank week must start blank.
+      document.getElementById('p-fields').innerHTML = prodFields(va, row || {});
+      document.getElementById('p-notes').value = (row && row.notes) || '';
+      wkLabel.innerHTML = 'Saved as "' + ericka.weekLabelFor(d) + '" · '
+        + (row
+            ? 'already entered' + (row.updated_at ? ', last updated ' + new Date(row.updated_at).toLocaleDateString('en-AU') : '')
+            : '<b>new week</b>');
     }
-    if (wkInput) { wkInput.addEventListener('change', refreshWeekLabel); refreshWeekLabel(); }
+    if (wkInput) { wkInput.addEventListener('change', loadWeek); loadWeek(); }
 
     const save = document.getElementById('p-save');
     if (save) save.onclick = async function () {
@@ -354,7 +376,10 @@
       });
       try {
         await ericka.saveProductivity(payload);
-        va.productivity = local;
+        va.history = (va.history || []).filter(r => r.period_start !== payload.periodStart);
+        va.history.unshift(local);
+        va.history.sort((a, b) => (b.period_start || '').localeCompare(a.period_start || ''));
+        va.productivity = va.history[0];
         document.getElementById('p-msg').style.color = 'var(--ok)';
         document.getElementById('p-msg').textContent = 'Saved ✓';
       } catch (e) {

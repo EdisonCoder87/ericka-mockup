@@ -23,6 +23,7 @@ SUPABASE_PAT=sbp_… node run_migrations.js <file.sql>
 | 11 | `migration_11_ai_modules.sql` | the 11 AI certification modules + content |
 | 12 | `migration_12_ai_quizzes.sql` | quizzes for the AI track |
 | 13 | `migration_13_demo_clinics.sql` | the two demo clinics Grace demos from |
+| 14 | `migration_14_period_key.sql` | keys a performance row on its week, not its label |
 
 **⚠️ Never re-run 05 or 06** — they drop the `productivity` table.
 **⚠️ Never re-run 03 or 04 after 11/12** — they wipe *all* module content / quizzes, AI track included.
@@ -80,5 +81,8 @@ lights once that is verified — a badge a quiz alone can mint is worth nothing 
   The anon key can still read `pay_rate` directly.
 - **3CX numbers are typed in.** Send one real weekly report and the entry form can take a
   paste/upload instead.
+- **Practical sign-off is enforced in the app, not the database.** With RLS off, the public
+  key can write to `training_progress` directly, so a determined member could mint their own
+  AI badge. Same gate as everything else — it closes when RLS goes on.
 - The demo clinics live in the live database. They are hidden from managers and labelled
   "Demo" for owners — delete them once a real dental client is onboarded.

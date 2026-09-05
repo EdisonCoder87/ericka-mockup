@@ -118,7 +118,9 @@
   const DAYS  = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
   const rates   = await ericka.perfRates();
-  const periods = await ericka.periodsForClient(s.client_id);
+  // Only weeks with a real date can be selected — a label-only row has no key
+  // to filter on, and picking it would silently show a different week.
+  const periods = (await ericka.periodsForClient(s.client_id)).filter(p => p.period_start);
   let selectedPeriod = periods.length ? periods[0].period_start : null;
   let board = await ericka.clientBoard(s.client_id, selectedPeriod);
 
@@ -297,7 +299,9 @@
       g.vas.push(va);
     });
 
-    const set = ericka.metricSet(board[0].vertical);
+    // A client can have both medical and dental members; explain the revenue
+    // maths for every set on screen, not just the first member's.
+    const verticals = [...new Set(board.map(v => v.vertical || 'medical'))];
     const picker = periods.length > 1
       ? '<select id="period-pick" style="padding:8px 10px;font-size:13px;max-width:230px">'
         + periods.map(p => '<option value="' + esc(p.period_start || '') + '"'
@@ -310,11 +314,15 @@
       +   '<div class="section-h" style="margin:0">Performance <span>what the team delivered</span></div>'
       +   picker
       + '</div>'
-      + '<div style="font-size:12px;color:var(--grey);margin:-6px 0 12px">' + set.source
-      +   ' — reports arrive after the week closes, so this is the last completed period, not live. '
-      +   set.groups.filter(g => g.rev && g.rev.rate)
-            .map(g => g.name + ' = booked × $' + Number(rates[g.rev.rate]).toFixed(2)).join(' · ')
-      +   (set.groups.some(g => g.rev && g.rev.entered) ? ' · Arrears = $ actually collected.' : '')
+      + '<div style="font-size:12px;color:var(--grey);margin:-6px 0 12px">'
+      +   'Reports arrive after the week closes, so this is the last completed period, not live.<br>'
+      +   verticals.map(function (t) {
+            const set = ericka.metricSet(t);
+            return '<b>' + set.label + ':</b> ' + set.source + '. '
+              + set.groups.filter(g => g.rev && g.rev.rate)
+                  .map(g => g.name + ' = booked × $' + Number(rates[g.rev.rate]).toFixed(2)).join(' · ')
+              + (set.groups.some(g => g.rev && g.rev.entered) ? ' · Arrears = $ actually collected.' : '');
+          }).join('<br>')
       + '</div>'
       + ericka.buildScoreboard(board, rates)
       + '<div class="section-h" style="margin-top:34px">Your team <span>by site · tap a VA for their modules</span></div>'
