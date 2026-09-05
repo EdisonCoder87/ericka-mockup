@@ -51,8 +51,8 @@ website or Zoho email.
 3. Tick **☑ Enforce HTTPS** — GitHub issues the free SSL cert automatically.
 
 ## Then
-Open **https://portal.ericka.com.au** — should load with the padlock. Test with admin PIN
-`1988`.
+Open **https://portal.ericka.com.au** — should load with the padlock. Sign in as
+**Edison Nguyen**, PIN `1234` (every account is on 1234 for handover).
 
 **Temporary quirk:** once the CNAME file is pushed, the old
 `edisoncoder87.github.io/ericka-mockup/` URL may error until Steps 2–3 are complete. Expected.

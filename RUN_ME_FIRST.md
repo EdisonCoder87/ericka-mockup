@@ -38,18 +38,28 @@ SUPABASE_PAT=sbp_… node run_migrations.js migration_13_demo_clinics.sql
 
 ## 3. Who logs in
 
-| Tier | Who | Starting PIN |
-|---|---|---|
-| Owner (`admin`) | Edison Nguyen | 1988 |
-| Owner (`admin`) | Grace Sia | 1234 |
-| Ericka Manager (`manager`) | Shane · Sharica | 1234 |
-| Client (`client_admin`, view only) | Nikki (SIA Medical) · Radmila Dusanovic | 2024 / 1234 |
-| Remote member (`va`) | the real team | 1234 |
-| **Demo owner — dental** | Demo Owner (Dental) | **9911** |
-| **Demo owner — medical** | Demo Owner (Medical) | **9922** |
+**Every account is on PIN `1234`** (reset 2026-09-05 for handover). Pick the name from the
+dropdown, type 1234. Each person changes theirs on first login — client and VA via
+**My Account**, owner and manager via the **Admin** page.
 
-Grace demos from **9911** (dental) or **9922** (medical). Both are seeded demo clinics —
-the real SIA Medical account stays truthful and is never dressed up with invented numbers.
+| Tier | Who |
+|---|---|
+| Owner (`admin`) | Edison Nguyen · Grace Sia |
+| Ericka Manager (`manager`) | Shane · Sharica |
+| Client (`client_admin`, view only) | Nikki (SIA Medical) · Radmila Dusanovic |
+| Remote member (`va`) | the real team |
+| **Demo owner — dental** | Demo Owner (Dental) |
+| **Demo owner — medical** | Demo Owner (Medical) |
+
+Grace demos from **Demo Owner (Dental)** or **Demo Owner (Medical)**. Both are seeded demo
+clinics — the real SIA Medical account stays truthful and is never dressed up with invented
+numbers.
+
+To put everyone back on 1234 later (e.g. before another handover):
+
+```sql
+update users set pin = '1234';
+```
 
 ## 4. What a client sees on their page
 - **Coverage** — who is clocked in right now, and hours covered per day this week.
@@ -78,7 +88,8 @@ lights once that is verified — a badge a quiz alone can mint is worth nothing 
 ## Known debt
 - **No RLS yet.** Fine while every client is friendly. Before an arm's-length paying client
   gets a login: switch on Supabase Auth + Row-Level Security (the schema is RLS-ready).
-  The anon key can still read `pay_rate` directly.
+  The anon key can still read `pay_rate` — and `pin` — directly, so a shared starting PIN
+  isn't what's holding the door shut either way. RLS is.
 - **3CX numbers are typed in.** Send one real weekly report and the entry form can take a
   paste/upload instead.
 - **Practical sign-off is enforced in the app, not the database.** With RLS off, the public

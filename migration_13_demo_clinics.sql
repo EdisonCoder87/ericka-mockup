@@ -15,6 +15,8 @@
 --
 --   Also adds the dental onboarding spine (titles only — content TODO), so a
 --   dental VA card shows an onboarding bar like a medical one does.
+--
+--   Demo accounts seed on PIN 1234, the same as every other account.
 -- Re-runnable: wipes and rebuilds all demo data.
 -- ============================================================================
 
@@ -43,22 +45,22 @@ insert into clients (id, name, vertical) values
 insert into users (id, name, pin, role, client_id, vertical, billable_rate, pay_rate,
                    site, rostered_hours, is_demo, active) values
  -- Dental
- ('e2000000-0000-0000-0000-000000000001','Demo Owner (Dental)','9911','client_admin',
+ ('e2000000-0000-0000-0000-000000000001','Demo Owner (Dental)','1234','client_admin',
   '33333333-3333-3333-3333-333333333333','dental',0,0,null,0,true,true),
- ('e3000000-0000-0000-0000-000000000001','Mika Reyes','9901','va',
+ ('e3000000-0000-0000-0000-000000000001','Mika Reyes','1234','va',
   '33333333-3333-3333-3333-333333333333','dental',35,0,'Main Street',38,true,true),
- ('e3000000-0000-0000-0000-000000000002','Dana Cruz','9902','va',
+ ('e3000000-0000-0000-0000-000000000002','Dana Cruz','1234','va',
   '33333333-3333-3333-3333-333333333333','dental',35,0,'Main Street',30,true,true),
- ('e3000000-0000-0000-0000-000000000003','Jomar Lim','9903','va',
+ ('e3000000-0000-0000-0000-000000000003','Jomar Lim','1234','va',
   '33333333-3333-3333-3333-333333333333','dental',35,0,'Northside',20,true,true),
  -- Medical
- ('e2000000-0000-0000-0000-000000000002','Demo Owner (Medical)','9922','client_admin',
+ ('e2000000-0000-0000-0000-000000000002','Demo Owner (Medical)','1234','client_admin',
   '44444444-4444-4444-4444-444444444444','medical',0,0,null,0,true,true),
- ('e4000000-0000-0000-0000-000000000001','Ana Bautista','9904','va',
+ ('e4000000-0000-0000-0000-000000000001','Ana Bautista','1234','va',
   '44444444-4444-4444-4444-444444444444','medical',35,0,'Northcote',38,true,true),
- ('e4000000-0000-0000-0000-000000000002','Rey Santos','9905','va',
+ ('e4000000-0000-0000-0000-000000000002','Rey Santos','1234','va',
   '44444444-4444-4444-4444-444444444444','medical',35,0,'Northcote',38,true,true),
- ('e4000000-0000-0000-0000-000000000003','Cielo Ramos','9906','va',
+ ('e4000000-0000-0000-0000-000000000003','Cielo Ramos','1234','va',
   '44444444-4444-4444-4444-444444444444','medical',35,0,'Sunshine',24,true,true);
 
 -- 5. Timesheets — this week, Melbourne time ----------------------------------
