@@ -1,60 +1,84 @@
-# Ericka Portal — read this when you wake up ☀️
+# Ericka Portal — current state
 
-Everything's built and pushed. There's **one manual step only you can do**: run the SQL
-migrations in Supabase (I can't run database changes with just the public key).
+Live at **https://portal.ericka.com.au** (GitHub Pages + Supabase; no server, $0/mo to run).
 
-## 1. Migrations — I run these for you
-Claude runs the SQL migrations directly via the Supabase Management API (`run_migrations.js`
-with your access token), so you don't touch the SQL editor. Current set (01→06):
+## 1. Migrations — Claude runs these for you
+Run directly via the Supabase Management API, so you never touch the SQL editor:
 
-1. `migration_01_sites.sql` — sites (Footscray/Essendon) + Grace
-2. `migration_02_structure.sql` — 16 modules + the team-lead role
-3. `migration_03_content.sql` — module content + the Footscray cheat sheet
-4. `migration_04_quizzes.sql` — the quizzes
-5. `migration_05_productivity.sql` — (superseded by 06)
-6. `migration_06_scorecard.sql` — the full performance scorecard + revenue rates
+```
+SUPABASE_PAT=sbp_… node run_migrations.js <file.sql>
+```
 
-If you'd rather run one yourself: SQL Editor → New query → paste the file → **Run without RLS**.
-
-## 2. Live site
-https://edisoncoder87.github.io/ericka-mockup/ (give it ~1 min to rebuild after you push)
-
-## 3. Log in and test (PINs)
-| Role | Name | PIN |
+| # | File | What it does |
 |---|---|---|
-| Admin (you) | Edison Nguyen | **1988** |
-| Team Lead | Joan Cruz (Team Lead) | **5555** |
-| SIA Medical (client) | Nikki (SIA Medical) | **2024** |
-| Medical VA · Footscray | Bea Villanueva | **1111** |
-| Medical VA · Essendon | Joy Tolentino | **2222** |
-| Medical VA · Footscray | Grace Mendoza | **4444** |
-| Dental VA | Ericka Dela Cruz | **3333** |
+| 01 | `migration_01_sites.sql` | sites (Footscray / Essendon) |
+| 02 | `migration_02_structure.sql` | 16 modules + the team-lead role |
+| 03 | `migration_03_content.sql` | module content + the Footscray cheat sheet |
+| 04 | `migration_04_quizzes.sql` | the quizzes |
+| 05–06 | `migration_05/06_*.sql` | the performance scorecard + revenue rates |
+| 07 | `migration_07_real_team.sql` | the real 4-tier access model |
+| 08 | `migration_08_tighten_grants.sql` | security: revoke anon DELETE/TRUNCATE |
+| 09 | `migration_09_general_va.sql` | General VAs (no clinic) |
+| 10 | `migration_10_roster_metrics.sql` | rostered hours · answer rate · orderable periods · dental metrics · AI-track columns |
+| 11 | `migration_11_ai_modules.sql` | the 11 AI certification modules + content |
+| 12 | `migration_12_ai_quizzes.sql` | quizzes for the AI track |
+| 13 | `migration_13_demo_clinics.sql` | the two demo clinics Grace demos from |
 
-### What to check
-- **Bea (1111):** *My Training* splits **Onboarding (6)** + **Training (10)**. Open a module → read
-  the content → **take the quiz** → pass (≥75%) to complete it. **📇 Footscray Cheat Sheet** is in her sidebar.
-- **Joy (2222):** same tracks, but **no cheat sheet link** (she's Essendon — site-scoping works).
-- **Joan (5555):** lands on the **Team view** — whole remote team grouped by client → site, onboarding
-  + training progress, tap a VA for their checklist.
-- **Edison (1988):** Home → **Team** opens that same board.
-- **Nikki (2024):** her VA cards show **Onboarding + Training** split; tap for the grouped checklist.
+**⚠️ Never re-run 05 or 06** — they drop the `productivity` table.
+**⚠️ Never re-run 03 or 04 after 11/12** — they wipe *all* module content / quizzes, AI track included.
 
-## 4. What's new this session
-- **16 modules** of real content pulled from the Footscray manual (6 onboarding + 10 training).
-- **Quizzes** on every module except the onboarding gateway — passing is what marks a module complete,
-  with per-question feedback + retry.
-- **Footscray Cheat Sheet** — doctors/rooms, availability & rules, fees, treatment-room fees, staff
-  languages, allied health, difficult-situation scripts, and systems (passwords deliberately **not** stored).
-- **Team-lead role** + whole-team progress board.
+## 2. Before a client demo — refresh the demo data
+Demo timesheets are seeded relative to the current week, so they go stale after Sunday.
+One command puts them back:
 
-## 5. Deliberately deferred (needs your go-ahead)
-- **AI phone-call practice** — this needs a small server + API keys + real per-call spend (Sonnet +
-  text-to-speech + speech-to-text), so I didn't switch it on unsupervised. Design notes are in
-  `AI_CALLS_DESIGN.md` for when you want to green-light it.
-- **Live admin CRUD** (add VAs / set PIN / site from the UI) — skipped for now because it needs the
-  database opened up for writes, which isn't safe until RLS is on. For now, add/edit people in the
-  **Supabase Table editor** (the `users` table).
+```
+SUPABASE_PAT=sbp_… node run_migrations.js migration_13_demo_clinics.sql
+```
 
-## Known debt (unchanged)
-No RLS yet — fine for SIA Medical (friendly, no patient data here). Before any arm's-length paying
-client: turn on Supabase Auth + Row-Level Security (the schema is already RLS-ready).
+## 3. Who logs in
+
+| Tier | Who | Starting PIN |
+|---|---|---|
+| Owner (`admin`) | Edison Nguyen | 1988 |
+| Owner (`admin`) | Grace Sia | 1234 |
+| Ericka Manager (`manager`) | Shane · Sharica | 1234 |
+| Client (`client_admin`, view only) | Nikki (SIA Medical) · Radmila Dusanovic | 2024 / 1234 |
+| Remote member (`va`) | the real team | 1234 |
+| **Demo owner — dental** | Demo Owner (Dental) | **9911** |
+| **Demo owner — medical** | Demo Owner (Medical) | **9922** |
+
+Grace demos from **9911** (dental) or **9922** (medical). Both are seeded demo clinics —
+the real SIA Medical account stays truthful and is never dressed up with invented numbers.
+
+## 4. What a client sees on their page
+- **Coverage** — who is clocked in right now, and hours covered per day this week.
+- **Performance** — the last completed week from the weekly reports, with week-on-week
+  deltas and a period picker. Metrics switch on the vertical: a dental owner sees recalls,
+  failed appointments and unscheduled treatment; a GP sees Care Plan Reviews and Health
+  Assessments. Both see answer rate.
+- **Per member** — onboarding / training / AI certification bars, capabilities, hours this
+  week **against their roster** (with an on-pace / behind read), and billable value.
+
+## 5. Rostered hours
+One number per member (`users.rostered_hours`) — no weekly typing. Set it in **Team →
+tap a member → Save roster**, or inline on the **Admin** page. Managers may edit it
+(it is not pay data). The client sees actual vs rostered, pro-rated to how far through
+the week it is, so nobody reads as "behind" at 9am on a Tuesday.
+
+## 6. AI certification
+Two tiers a member earns, shown to the client as a badge:
+- **🤖 AI Assisted** (6 modules) — uses AI to problem-solve, communicate and write process.
+- **🛠️ AI Builder** (5 modules) — builds small tools and automations with Claude Code.
+
+Each tier ends in a **practical**: the member pastes a link to real work on the module page,
+and a manager signs it off in **Team → tap a member → Practicals submitted**. The badge only
+lights once that is verified — a badge a quiz alone can mint is worth nothing to a client.
+
+## Known debt
+- **No RLS yet.** Fine while every client is friendly. Before an arm's-length paying client
+  gets a login: switch on Supabase Auth + Row-Level Security (the schema is RLS-ready).
+  The anon key can still read `pay_rate` directly.
+- **3CX numbers are typed in.** Send one real weekly report and the entry form can take a
+  paste/upload instead.
+- The demo clinics live in the live database. They are hidden from managers and labelled
+  "Demo" for owners — delete them once a real dental client is onboarded.

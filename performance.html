@@ -42,7 +42,7 @@
   // Admin / team lead / Ericka manager see the whole team; a VA & the client
   // admin see only their own client's team.
   let list = (s.role === 'admin' || s.role === 'team_lead' || s.role === 'manager')
-    ? await ericka.teamBoard()
+    ? await ericka.teamBoard(s.role === 'admin')   // owners also see the demo clinics
     : await ericka.clientBoard(s.client_id);
   // General VAs never appear on the KPI leaderboard.
   list = list.filter(v => !ericka.isGeneralVA(v));
@@ -51,10 +51,18 @@
     list.length ? ericka.buildScoreboard(list, rates)
                 : '<div class="panel" style="padding:26px;color:var(--grey)">No team members yet.</div>';
 
-  document.getElementById('footnote').textContent =
-    'Calls entered from 3CX · bookings from HotDoc/Pracsoft (team lead). '
-    + 'CP revenue = Booked × $' + rates.cp_value.toFixed(2) + ' · HA revenue = Booked × $' + rates.ha_value.toFixed(2)
-    + ' · Arrears = $ actually collected.';
+  // Footnote explains the revenue maths for whichever verticals are on screen.
+  const verticals = [...new Set(list.map(v => v.vertical || 'medical'))];
+  document.getElementById('footnote').textContent = verticals.map(function (t) {
+    const set = ericka.metricSet(t);
+    return set.label + ': ' + set.source + '. '
+      + set.groups.filter(g => g.rev && g.rev.rate)
+          .map(g => g.name + ' = booked × $' + Number(rates[g.rev.rate]).toFixed(2)).join(' · ')
+      + ' · Arrears = $ actually collected.';
+  }).join('  ');
+
+  document.getElementById('sub').textContent =
+    'Entered from the weekly reports — the last completed period, not live.';
 })();
 </script>
 </body>

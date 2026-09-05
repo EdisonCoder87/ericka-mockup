@@ -78,6 +78,8 @@
             <select id="m-site"></select></div>
           <div class="fld"><label for="m-pin">Starting PIN</label>
             <input id="m-pin" type="text" inputmode="numeric" placeholder="4–6 digits" autocomplete="off"></div>
+          <div class="fld"><label for="m-ros">Rostered hrs / week</label>
+            <input id="m-ros" type="number" min="0" max="80" step="0.5" placeholder="e.g. 38"></div>
         </div>
         <div class="row-flex" id="rate-row" style="display:none;margin-bottom:12px">
           <div class="fld"><label for="m-bill">Billable rate ($/hr)</label>
@@ -96,8 +98,8 @@
     <div class="section-h">Remote team members <span>reassign clinic · reset PIN · activate</span></div>
     <div class="panel" style="padding:16px;overflow-x:auto;margin-bottom:26px">
       <table class="mtbl">
-        <thead><tr><th>Name</th><th>Clinic</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody id="mrows"><tr><td colspan="4" style="color:var(--grey)">Loading…</td></tr></tbody>
+        <thead><tr><th>Name</th><th>Clinic</th><th>Rostered hrs/wk</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="mrows"><tr><td colspan="5" style="color:var(--grey)">Loading…</td></tr></tbody>
       </table>
     </div>
 
@@ -140,20 +142,26 @@
 
   let members = [];
   async function refresh() {
-    members = await ericka.listMembers();
+    members = await ericka.listMembers(isAdmin);
     document.getElementById('s-count').textContent =
       members.filter(m => m.active).length;
     const tb = document.getElementById('mrows');
     if (!members.length) {
-      tb.innerHTML = '<tr><td colspan="4" style="color:var(--grey)">No members yet — add your first above.</td></tr>';
+      tb.innerHTML = '<tr><td colspan="5" style="color:var(--grey)">No members yet — add your first above.</td></tr>';
       return;
     }
     tb.innerHTML = members.map(function (m) {
-      const opts = '<option value="">— Unassigned —</option>' + ericka.CLINICS.map(c =>
-        '<option value="' + c + '"' + (c === m.site ? ' selected' : '') + '>' + c + '</option>').join('');
+      const choices = ericka.CLINICS.slice();
+      if (m.site && choices.indexOf(m.site) === -1) choices.unshift(m.site);
+      const opts = '<option value="">— Unassigned —</option>' + choices.map(c =>
+        '<option value="' + esc(c) + '"' + (c === m.site ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
       return '<tr class="' + (m.active ? '' : 'off') + '" data-id="' + m.id + '">'
-        + '<td data-l="Name"><b>' + esc(m.name) + '</b></td>'
+        + '<td data-l="Name"><b>' + esc(m.name) + '</b>'
+        +   (m.is_demo ? ' <span class="chip" style="background:#fdf2e0;color:var(--warn)">Demo</span>' : '') + '</td>'
         + '<td data-l="Clinic"><select class="js-site">' + opts + '</select><span class="flash js-siteflash"></span></td>'
+        + '<td data-l="Rostered hrs/wk"><input class="js-ros" type="number" min="0" max="80" step="0.5" '
+        +   'value="' + (Number(m.rostered_hours) || '') + '" placeholder="—" style="width:82px;padding:7px 9px">'
+        +   '<span class="flash js-rosflash"></span></td>'
         + '<td data-l="Status">' + (m.active
               ? '<span class="chip chip-ok">Active</span>'
               : '<span class="chip chip-open">Inactive</span>') + '</td>'
@@ -173,6 +181,14 @@
               m.site = this.value; fl.className = 'flash'; fl.textContent = 'Saved ✓';
               setTimeout(() => fl.textContent = '', 1800); }
         catch (e) { fl.className = 'flash msg-err'; fl.textContent = 'Failed'; }
+      });
+      // set rostered hours (not pay data — managers may edit it)
+      tr.querySelector('.js-ros').addEventListener('change', async function () {
+        const fl = tr.querySelector('.js-rosflash');
+        try { await ericka.updateMember(id, { rostered_hours: this.value });
+              m.rostered_hours = this.value; fl.className = 'flash'; fl.textContent = 'Saved ✓';
+              setTimeout(() => fl.textContent = '', 1800); }
+        catch (e) { fl.className = 'flash msg-err'; fl.textContent = e.message || 'Failed'; }
       });
       // reset pin
       tr.querySelector('.js-pin').addEventListener('click', async function () {
@@ -201,6 +217,7 @@
       site: site,
       pin:  document.getElementById('m-pin').value,
       role: 'va', vertical: 'medical',
+      rostered_hours: parseFloat(document.getElementById('m-ros').value) || 0,
       // General VAs aren't tied to a clinic client; clinic VAs → SIA Medical.
       clientId: (site === ericka.GENERAL_VA) ? null : ericka.SIA_MEDICAL_CLIENT_ID
     };

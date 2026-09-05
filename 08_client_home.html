@@ -42,6 +42,7 @@
   </div>
   <div class="nav-group-label">Your team</div>
   <a href="08_client_home.html" class="active"><span class="ic">🏠</span> Home</a>
+  <a href="#coverage"><span class="ic">🟢</span> Who's on now</a>
   <a href="performance.html"><span class="ic">📊</span> Performance</a>
   <a href="#board"><span class="ic">👥</span> My VAs</a>
   <a href="account.html"><span class="ic">🔑</span> My Account</a>
@@ -55,23 +56,26 @@
       <div class="hero-left">
         <div class="hero-label">Welcome back</div>
         <h1 class="hero-name" id="hero-name">Hi 👋</h1>
-        <p class="hero-tagline">Here's your Ericka team — their training, capabilities and hours this week. Everything in one place.</p>
+        <p class="hero-tagline">Here's your Ericka team — who's on right now, how they're tracking against their roster, what they've delivered, and what they're certified to do.</p>
         <span class="badge-pill" id="client-badge" style="border-color:var(--lilt);color:#fff;background:rgba(255,255,255,.12)">
           <span class="dot"></span> <span id="client-name">Your clinic</span>
         </span>
       </div>
       <div class="hero-right">
         <div class="stat"><div class="v" id="s-vas">–</div><div class="l">Your VAs</div></div>
-        <div class="stat"><div class="v" id="s-hrs">–</div><div class="l">Hrs this wk</div></div>
-        <div class="stat"><div class="v" id="s-train">–</div><div class="l">Training done</div></div>
+        <div class="stat"><div class="v" id="s-on">–</div><div class="l">On right now</div></div>
+        <div class="stat"><div class="v" id="s-hrs">–</div><div class="l" id="s-hrs-l">Hrs this wk</div></div>
+        <div class="stat"><div class="v" id="s-ai">–</div><div class="l">AI certified</div></div>
       </div>
     </div>
   </div>
 
   <div class="wrap">
-    <div class="section-h" id="board">Your team <span>grouped by site · tap a VA for their modules</span></div>
+    <div class="section-h" id="coverage">Coverage <span>who is on the phones</span></div>
+    <div id="coverage-panel"><div class="panel" style="padding:26px;color:var(--grey)">Loading…</div></div>
+
     <div id="board-cards">
-      <div class="panel" style="padding:26px;color:var(--grey)">Loading your team…</div>
+      <div class="panel" style="padding:26px;color:var(--grey);margin-top:20px">Loading your team…</div>
     </div>
 
     <div class="quote">
@@ -108,88 +112,170 @@
   if (client) document.getElementById('client-name').textContent = client.name;
 
   const initials = n => n.replace(/\s*\(.*\)$/, '').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
-  const rates = await ericka.perfRates();
-  const board = await ericka.clientBoard(s.client_id);
+  const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const money = v => '$' + Math.round(v).toLocaleString();
+  const time  = t => new Date(t).toLocaleTimeString('en-AU', {hour:'numeric', minute:'2-digit'});
+  const DAYS  = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
-  // hero stats
-  const totalHrs = board.reduce((t,v) => t + v.hours, 0);
-  const dDone = board.reduce((t,v) => t + v.modulesDone, 0);
-  const dTot  = board.reduce((t,v) => t + v.modulesTotal, 0);
-  document.getElementById('s-vas').textContent   = board.length;
-  document.getElementById('s-hrs').textContent   = totalHrs.toFixed(1);
-  document.getElementById('s-train').textContent = dTot ? Math.round(dDone/dTot*100) + '%' : '0%';
+  const rates   = await ericka.perfRates();
+  const periods = await ericka.periodsForClient(s.client_id);
+  let selectedPeriod = periods.length ? periods[0].period_start : null;
+  let board = await ericka.clientBoard(s.client_id, selectedPeriod);
 
-  const el = document.getElementById('board-cards');
-  if (!board.length) {
-    el.innerHTML = '<div class="panel" style="padding:26px;color:var(--grey)">No VAs assigned to your team yet.</div>';
-    return;
+  // ── hero stats ──────────────────────────────────────────────────────────
+  function renderHero() {
+    const liveHrs = board.reduce((t,v) => t + v.hours, 0);
+    const rost    = board.reduce((t,v) => t + v.rostered, 0);
+    const onNow   = board.filter(v => v.openSince).length;
+    const certified = board.filter(v => v.badges.some(b => b.earned)).length;
+    document.getElementById('s-vas').textContent = board.length;
+    document.getElementById('s-on').textContent  = onNow;
+    document.getElementById('s-hrs').textContent = liveHrs.toFixed(0) + (rost ? ' / ' + rost.toFixed(0) : '');
+    document.getElementById('s-hrs-l').textContent = rost ? 'Hrs this wk / rostered' : 'Hrs this wk';
+    document.getElementById('s-ai').textContent  = certified + ' / ' + board.length;
   }
 
-  // index VAs by id for the modal, and group by site (board is already site-ordered)
-  const byId = {};
-  const sites = [];
-  board.forEach(function (va) {
-    byId[va.id] = va;
-    let g = sites.find(s => s.name === va.site);
-    if (!g) { g = { name: va.site, vas: [] }; sites.push(g); }
-    g.vas.push(va);
-  });
+  // ── coverage: who's on now + hours per day ──────────────────────────────
+  function renderCoverage() {
+    const on  = board.filter(v => v.openSince);
+    const off = board.filter(v => !v.openSince);
+    const byDay = [0,0,0,0,0,0,0];
+    board.forEach(v => v.byDay.forEach((h,i) => { byDay[i] += h; }));
+    const peak = Math.max(1, ...byDay);
+    const todayIdx = (new Date().getDay() + 6) % 7;
 
-  function miniBar(label, done, total, gold) {
-    const pct = total ? Math.round(done/total*100) : 0;
+    const person = (v, live) =>
+      '<div style="display:flex;align-items:center;gap:9px;padding:8px 0">'
+      + '<span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:'
+        + (live ? 'var(--ok)' : 'var(--line)') + '"></span>'
+      + '<b style="font-size:14px' + (live ? '' : ';color:var(--grey);font-weight:600') + '">' + esc(v.name) + '</b>'
+      + '<span style="font-size:12px;color:var(--grey);margin-left:auto;text-align:right">'
+        + (live ? 'since ' + time(v.openSince)
+                : (v.lastOut ? 'last out ' + time(v.lastOut) : 'not on today'))
+      + '</span></div>';
+
+    document.getElementById('coverage-panel').innerHTML =
+      '<div class="panel" style="padding:22px 24px">'
+      + '<div style="display:flex;gap:34px;flex-wrap:wrap">'
+      +   '<div style="flex:1 1 260px;min-width:240px">'
+      +     '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin-bottom:6px">'
+      +       'On right now · ' + on.length + ' of ' + board.length + '</div>'
+      +     (on.map(v => person(v, true)).join('') || '<div style="font-size:13px;color:var(--grey);padding:8px 0">Nobody is clocked in at the moment.</div>')
+      +     (off.length ? '<div style="border-top:1px solid var(--line);margin-top:8px;padding-top:4px">'
+                        + off.map(v => person(v, false)).join('') + '</div>' : '')
+      +   '</div>'
+      +   '<div style="flex:1 1 260px;min-width:240px">'
+      +     '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin-bottom:10px">Hours covered this week</div>'
+      +     '<div style="display:flex;align-items:flex-end;gap:8px;height:96px">'
+      +       byDay.map(function (h, i) {
+                const pctH = Math.round(h / peak * 62);
+                return '<div style="flex:1;text-align:center">'
+                  + '<div style="font-size:10px;font-weight:700;color:var(--grey);margin-bottom:3px">' + (h ? h.toFixed(0) : '') + '</div>'
+                  + '<div style="height:' + Math.max(3, pctH) + 'px;border-radius:5px 5px 0 0;background:'
+                    + (i === todayIdx ? 'var(--gold)' : 'var(--violet)') + ';opacity:' + (h ? 1 : .18) + '"></div>'
+                  + '<div style="font-size:10px;font-weight:700;color:' + (i === todayIdx ? 'var(--gold-text)' : 'var(--grey)') + ';margin-top:5px">' + DAYS[i] + '</div>'
+                  + '</div>';
+              }).join('')
+      +     '</div>'
+      +     '<div style="font-size:11px;color:var(--grey);margin-top:8px">Live from clock-in / clock-out. Today is highlighted.</div>'
+      +   '</div>'
+      + '</div></div>';
+  }
+
+  // ── one VA card ─────────────────────────────────────────────────────────
+  function miniBar(label, done, total, cls) {
+    if (!total) return '';
+    const pct = Math.round(done/total*100);
     return '<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:var(--grey)"><span>'
       + label + '</span><span>' + done + ' / ' + total + '</span></div>'
-      + '<div class="pbar' + (gold?' gold':'') + '"><span style="width:' + pct + '%"></span></div>';
+      + '<div class="pbar' + (cls ? ' ' + cls : '') + '"><span style="width:' + pct + '%"></span></div>';
   }
-  function prodBox(label, val) {
-    return '<div style="flex:1;background:var(--cream);border:1px solid var(--line);border-radius:12px;padding:12px 14px;text-align:center">'
-      + '<div style="font-family:var(--f-display);font-weight:600;font-size:22px">' + (val==null?'–':val) + '</div>'
+  function badgeChips(va) {
+    return va.badges.map(function (b) {
+      if (b.earned) return '<span class="chip chip-ok" style="margin:0 6px 6px 0">' + b.icon + ' ' + b.label + '</span>';
+      if (b.awaitingVerification) return '<span class="chip chip-open" style="margin:0 6px 6px 0">' + b.icon + ' ' + b.label + ' · awaiting sign-off</span>';
+      if (b.done) return '<span class="chip" style="background:var(--mist);color:var(--violet-d);margin:0 6px 6px 0">' + b.icon + ' ' + b.label + ' ' + b.done + '/' + b.total + '</span>';
+      return '';
+    }).join('');
+  }
+  function hoursTile(va) {
+    const p = va.pace;
+    if (p.state === 'none') {
+      return '<div style="flex:1;background:var(--cream);border:1px solid var(--line);border-radius:12px;padding:14px 16px">'
+        + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--grey)">Hours this wk</div>'
+        + '<div style="font-family:var(--f-display);font-weight:600;font-size:24px;margin-top:2px">' + va.hours.toFixed(1) + '</div>'
+        + '<div style="font-size:11px;color:var(--grey);margin-top:2px">No roster set</div></div>';
+    }
+    const col = p.state === 'behind' ? 'var(--warn)' : (p.state === 'ahead' ? 'var(--violet)' : 'var(--ok)');
+    const word = p.state === 'behind' ? 'behind by ' + Math.abs(p.delta).toFixed(1) + ' h'
+               : p.state === 'ahead'  ? 'ahead by ' + p.delta.toFixed(1) + ' h'
+               : 'on pace';
+    return '<div style="flex:1;background:var(--cream);border:1px solid var(--line);border-radius:12px;padding:14px 16px">'
+      + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--grey)">Hours this week</div>'
+      + '<div style="font-family:var(--f-display);font-weight:600;font-size:24px;margin-top:2px">' + va.hours.toFixed(1)
+      +   ' <span style="font-size:14px;color:var(--grey)">/ ' + va.rostered.toFixed(0) + ' rostered</span></div>'
+      + '<div class="pbar" style="margin-top:8px;background:#fff"><span style="width:' + p.pct + '%;background:' + col + '"></span></div>'
+      + '<div style="font-size:11px;font-weight:700;color:' + col + ';margin-top:5px">' + p.pct + '% · ' + word + '</div></div>';
+  }
+  function prodBox(label, val, chip) {
+    // min-width + wrap so a long revenue figure can't blow the card out on a phone
+    return '<div style="flex:1 1 92px;min-width:92px;background:var(--cream);border:1px solid var(--line);border-radius:12px;padding:12px 8px;text-align:center">'
+      + '<div style="font-family:var(--f-display);font-weight:600;font-size:19px">' + (val == null ? '–' : val) + (chip || '') + '</div>'
       + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grey);margin-top:2px">' + label + '</div></div>';
   }
   function prodBlock(va) {
-    const p = va.productivity;
-    const d = p ? ericka.perfDerived(p, rates) : null;
+    const p = va.productivity, q = va.prevProductivity;
+    if (!p) {
+      return '<div style="margin-top:18px">'
+        + '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin-bottom:8px">Performance</div>'
+        + '<div style="font-size:13px;color:var(--grey)">No week entered yet.</div></div>';
+    }
+    const d  = ericka.perfDerived(p, rates, va.vertical);
+    const dq = q ? ericka.perfDerived(q, rates, va.vertical) : null;
+    const ar = ericka.answerRate(p), arq = q ? ericka.answerRate(q) : null;
+    const bk = ericka.bookedTotal(p, va.vertical), bkq = q ? ericka.bookedTotal(q, va.vertical) : null;
     return '<div style="margin-top:18px">'
       + '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">'
       +   '<span style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--grey)">Performance</span>'
-      +   (p && p.period_label ? '<span style="font-size:11px;color:var(--grey)">' + p.period_label + '</span>' : '')
+      +   '<span style="font-size:11px;color:var(--grey)">' + esc(p.period_label || '') + '</span>'
       + '</div>'
-      + (p
-          ? '<div style="display:flex;gap:10px">'
-            + prodBox('Inbound', p.calls_inbound)
-            + prodBox('Booked', (p.cpr_booked||0)+(p.ha_booked||0))
-            + prodBox('Revenue', '$' + Math.round(d.total).toLocaleString())
-            + '</div>'
-          : '<div style="font-size:13px;color:var(--grey)">Awaiting team-lead entry (from 3CX / HotDoc / Pracsoft).</div>')
-      + '</div>';
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+      +   prodBox('Answered', ar == null ? '–' : Math.round(ar*100) + '%', ericka.trendChip(ericka.trend(ar, arq), 'up'))
+      +   prodBox('Booked', bk, ericka.trendChip(ericka.trend(bk, bkq), 'up'))
+      +   prodBox('Revenue', money(d.total), ericka.trendChip(ericka.trend(d.total, dq ? dq.total : null), 'up'))
+      + '</div></div>';
   }
   function cardHtml(va) {
     const gold = va.vertical === 'medical';
     const vbadge = gold ? '<span class="chip chip-medical">🩺 Medical</span>'
                         : '<span class="chip chip-dental">🦷 Dental</span>';
     const caps = va.capabilities.length
-      ? va.capabilities.map(c => '<span class="chip chip-ok" style="margin:0 6px 6px 0">✓ ' + c + '</span>').join('')
+      ? va.capabilities.map(c => '<span class="chip chip-ok" style="margin:0 6px 6px 0">✓ ' + esc(c) + '</span>').join('')
       : '<span style="font-size:13px;color:var(--grey)">No capabilities earned yet.</span>';
+    const chips = badgeChips(va);
     return ''
       + '<div class="panel va-card" data-id="' + va.id + '" style="padding:24px">'
       +   '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">'
-      +     '<div class="who"><div class="avatar' + (gold?' gold':'') + '">' + initials(va.name) + '</div><b style="font-size:16px">' + va.name + '</b></div>'
+      +     '<div class="who"><div class="avatar' + (gold?' gold':'') + '">' + initials(va.name) + '</div>'
+      +       '<b style="font-size:16px">' + esc(va.name) + '</b>'
+      +       (va.openSince ? '<span title="On the phones now" style="width:9px;height:9px;border-radius:50%;background:var(--ok);display:inline-block"></span>' : '')
+      +     '</div>'
       +     vbadge
       +   '</div>'
-      +   '<div style="margin-top:18px">' + miniBar('Onboarding', va.onbDone, va.onbTotal, false) + '</div>'
-      +   '<div style="margin-top:12px">' + miniBar('Training', va.trnDone, va.trnTotal, gold) + '</div>'
-      +   '<div style="margin-top:18px">'
+      +   '<div style="margin-top:18px">' + miniBar('Onboarding', va.onbDone, va.onbTotal, '') + '</div>'
+      +   '<div style="margin-top:12px">' + miniBar('Training', va.trnDone, va.trnTotal, gold ? 'gold' : '') + '</div>'
+      +   '<div style="margin-top:12px">' + miniBar('AI certification', va.aiDone, va.aiTotal, 'gold') + '</div>'
+      +   (chips ? '<div style="margin-top:14px">' + chips + '</div>' : '')
+      +   '<div style="margin-top:14px">'
       +     '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin-bottom:8px">Capabilities</div>'
       +     '<div>' + caps + '</div>'
       +   '</div>'
-      +   '<div style="margin-top:18px;display:flex;gap:12px">'
-      +     '<div style="flex:1;background:var(--cream);border:1px solid var(--line);border-radius:12px;padding:14px 16px">'
-      +       '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--grey)">Hours this wk</div>'
-      +       '<div style="font-family:var(--f-display);font-weight:600;font-size:24px;margin-top:2px">' + va.hours.toFixed(1) + '</div>'
-      +     '</div>'
-      +     '<div style="flex:1;background:var(--cream);border:1px solid var(--line);border-radius:12px;padding:14px 16px">'
+      +   '<div style="margin-top:18px;display:flex;gap:12px;flex-wrap:wrap">'
+      +     hoursTile(va)
+      +     '<div style="flex:1;min-width:120px;background:var(--cream);border:1px solid var(--line);border-radius:12px;padding:14px 16px">'
       +       '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--grey)">Billable</div>'
       +       '<div style="font-family:var(--f-display);font-weight:600;font-size:24px;margin-top:2px;color:var(--gold-text)">$' + va.billable.toFixed(0) + '</div>'
+      +       '<div style="font-size:11px;color:var(--grey);margin-top:2px">completed shifts</div>'
       +     '</div>'
       +   '</div>'
       +   prodBlock(va)
@@ -197,57 +283,116 @@
       + '</div>';
   }
 
-  el.innerHTML = '<div class="section-h">Performance at a glance <span>your team this week</span></div>'
-    + '<div style="font-size:12px;color:var(--grey);margin:-6px 0 12px">Calls from 3CX · bookings from HotDoc/Pracsoft (entered by the team lead). '
-    + 'CP revenue = Booked × $' + rates.cp_value.toFixed(2) + ' · HA revenue = Booked × $' + rates.ha_value.toFixed(2) + ' · Arrears = $ collected.</div>'
-    + ericka.buildScoreboard(board, rates)
-    + '<div class="section-h" style="margin-top:34px">Your team <span>by site</span></div>'
-    + sites.map(function (g) {
-    return '<div class="site-head"><span class="pin">📍</span>' + g.name
-         + '<span class="n">' + g.vas.length + ' VA' + (g.vas.length===1?'':'s') + '</span></div>'
-         + '<div class="cards c2">' + g.vas.map(cardHtml).join('') + '</div>';
-  }).join('');
+  // ── board ───────────────────────────────────────────────────────────────
+  function renderBoard() {
+    const el = document.getElementById('board-cards');
+    if (!board.length) {
+      el.innerHTML = '<div class="panel" style="padding:26px;color:var(--grey)">No VAs assigned to your team yet.</div>';
+      return;
+    }
+    const sites = [];
+    board.forEach(function (va) {
+      let g = sites.find(x => x.name === va.site);
+      if (!g) { g = { name: va.site, vas: [] }; sites.push(g); }
+      g.vas.push(va);
+    });
 
-  // ---- drill-down modal --------------------------------------------------
+    const set = ericka.metricSet(board[0].vertical);
+    const picker = periods.length > 1
+      ? '<select id="period-pick" style="padding:8px 10px;font-size:13px;max-width:230px">'
+        + periods.map(p => '<option value="' + esc(p.period_start || '') + '"'
+            + (p.period_start === selectedPeriod ? ' selected' : '') + '>' + esc(p.period_label) + '</option>').join('')
+        + '</select>'
+      : '';
+
+    el.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin:34px 0 16px">'
+      +   '<div class="section-h" style="margin:0">Performance <span>what the team delivered</span></div>'
+      +   picker
+      + '</div>'
+      + '<div style="font-size:12px;color:var(--grey);margin:-6px 0 12px">' + set.source
+      +   ' — reports arrive after the week closes, so this is the last completed period, not live. '
+      +   set.groups.filter(g => g.rev && g.rev.rate)
+            .map(g => g.name + ' = booked × $' + Number(rates[g.rev.rate]).toFixed(2)).join(' · ')
+      +   (set.groups.some(g => g.rev && g.rev.entered) ? ' · Arrears = $ actually collected.' : '')
+      + '</div>'
+      + ericka.buildScoreboard(board, rates)
+      + '<div class="section-h" style="margin-top:34px">Your team <span>by site · tap a VA for their modules</span></div>'
+      + sites.map(function (g) {
+          return '<div class="site-head"><span class="pin">📍</span>' + esc(g.name)
+               + '<span class="n">' + g.vas.length + ' VA' + (g.vas.length===1?'':'s') + '</span></div>'
+               + '<div class="cards c2">' + g.vas.map(cardHtml).join('') + '</div>';
+        }).join('');
+
+    const pick = document.getElementById('period-pick');
+    if (pick) pick.addEventListener('change', async function () {
+      selectedPeriod = this.value || null;
+      board = await ericka.clientBoard(s.client_id, selectedPeriod);
+      renderHero(); renderBoard(); wireCards();
+    });
+  }
+
+  // ── drill-down modal ────────────────────────────────────────────────────
   function checklist(mods, cat, label) {
     const rows = mods.filter(m => m.category === cat);
     if (!rows.length) return '';
     return '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin:16px 0 4px">' + label + '</div>'
       + rows.map(function (m) {
-          const done = m.done;
-          return '<div class="mod-row ' + (done?'done':'todo') + '">'
-            + '<div class="mod-dot ' + (done?'done':'todo') + '">' + (done?'✓':(m.ord)) + '</div>'
-            + '<div class="mt">' + m.title + '</div>'
-            + '<div class="ms ' + (done?'done':'todo') + '">' + (done?'Done':'Remaining') + '</div>'
+          const pending = m.requiresEvidence && m.done && !m.verifiedAt;
+          const state = pending ? 'Awaiting sign-off' : (m.done ? 'Done' : 'Remaining');
+          return '<div class="mod-row ' + (m.done?'done':'todo') + '">'
+            + '<div class="mod-dot ' + (m.done && !pending ? 'done':'todo') + '">' + (m.done && !pending ? '✓' : m.ord) + '</div>'
+            + '<div class="mt">' + esc(m.title) + '</div>'
+            + '<div class="ms ' + (m.done && !pending ? 'done':'todo') + '">' + state + '</div>'
             + '</div>';
         }).join('');
   }
   function openModal(va) {
     const gold = va.vertical === 'medical';
-    const rows = checklist(va.modules, 'onboarding', 'Onboarding') + checklist(va.modules, 'training', 'Training');
     const p = va.productivity;
-    const d = p ? ericka.perfDerived(p, rates) : null;
     const line = (l, v) => '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span style="color:var(--grey)">' + l + '</span><b>' + v + '</b></div>';
-    const money = v => '$' + Math.round(v).toLocaleString();
-    const prod = p
-      ? line('Inbound calls', p.calls_inbound) + line('Scans', p.scans) + line('Confirmation calls', p.confirmation_calls)
-        + line('Arrears collected', money(d.arrears)) + line('Care plans booked', p.cpr_booked + ' (' + money(d.cprRev) + ')')
-        + line('Health assessments booked', p.ha_booked + ' (' + money(d.haRev) + ')')
-        + '<div style="display:flex;justify-content:space-between;font-size:14px;padding:8px 0 0;margin-top:6px;border-top:1px solid var(--line)"><b>Total revenue</b><b style="color:var(--gold-text)">' + money(d.total) + '</b></div>'
-        + '<div style="font-size:12px;color:var(--grey);margin-top:6px">' + (p.period_label || '') + (p.updated_at ? ' · updated ' + new Date(p.updated_at).toLocaleDateString('en-AU') : '') + '</div>'
-      : '<span style="font-size:13px;color:var(--grey)">Awaiting team-lead entry (from 3CX / HotDoc / Pracsoft).</span>';
+    let prod = '<span style="font-size:13px;color:var(--grey)">No week entered yet.</span>';
+    if (p) {
+      const d = ericka.perfDerived(p, rates, va.vertical);
+      const set = ericka.metricSet(va.vertical);
+      const ar = ericka.answerRate(p);
+      prod = (ar == null ? '' : line('Calls answered', Math.round(ar*100) + '% (' + (p.calls_inbound||0) + ' of ' + ((p.calls_inbound||0)+(p.calls_missed||0)) + ')'))
+        + set.groups.map(function (g) {
+            return g.fields.map(f => line(g.name + ' · ' + f.label, f.money ? money(p[f.k]||0) : (p[f.k]||0))).join('')
+              + (g.rev && !g.rev.entered ? line(g.name + ' value', money(d.byGroup(g.name))) : '');
+          }).join('')
+        + '<div style="display:flex;justify-content:space-between;font-size:14px;padding:8px 0 0;margin-top:6px;border-top:1px solid var(--line)"><b>Total value</b><b style="color:var(--gold-text)">' + money(d.total) + '</b></div>'
+        + '<div style="font-size:12px;color:var(--grey);margin-top:6px">' + esc(p.period_label || '')
+          + (p.updated_at ? ' · entered ' + new Date(p.updated_at).toLocaleDateString('en-AU') : '') + '</div>';
+    }
+    const certLine = va.badges.filter(b => b.earned).map(b => b.icon + ' ' + b.label).join(' · ');
     document.getElementById('modal-body').innerHTML = ''
-      + '<div class="who" style="margin-bottom:4px"><div class="avatar' + (gold?' gold':'') + '">' + initials(va.name) + '</div><b style="font-size:18px">' + va.name + '</b></div>'
-      + '<div style="font-size:13px;color:var(--grey);margin-bottom:6px">' + (gold?'🩺 Medical':'🦷 Dental') + ' · 📍 ' + va.site + ' · ' + va.modulesDone + ' of ' + va.modulesTotal + ' modules complete</div>'
-      + rows
+      + '<div class="who" style="margin-bottom:4px"><div class="avatar' + (gold?' gold':'') + '">' + initials(va.name) + '</div><b style="font-size:18px">' + esc(va.name) + '</b></div>'
+      + '<div style="font-size:13px;color:var(--grey);margin-bottom:6px">' + (gold?'🩺 Medical':'🦷 Dental') + ' · 📍 ' + esc(va.site) + ' · ' + va.modulesDone + ' of ' + va.modulesTotal + ' modules complete</div>'
+      + (certLine ? '<div style="font-size:13px;font-weight:700;color:var(--ok);margin-bottom:8px">' + certLine + '</div>' : '')
+      + '<div style="font-size:13px;color:var(--grey);margin-bottom:4px">'
+        + va.hours.toFixed(1) + ' hrs this week' + (va.rostered ? ' of ' + va.rostered.toFixed(0) + ' rostered' : '')
+        + (va.openSince ? ' · <b style="color:var(--ok)">on now since ' + time(va.openSince) + '</b>' : '') + '</div>'
+      + checklist(va.modules, 'onboarding', 'Onboarding')
+      + checklist(va.modules, 'training', 'Training')
+      + checklist(va.modules, 'ai', 'AI certification')
       + '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin:20px 0 6px">Performance</div>'
       + prod;
     document.getElementById('va-modal').style.display = 'flex';
   }
 
-  el.querySelectorAll('.va-card').forEach(function (c) {
-    c.addEventListener('click', function () { openModal(byId[c.dataset.id]); });
-  });
+  function wireCards() {
+    const byId = {};
+    board.forEach(v => { byId[v.id] = v; });
+    document.querySelectorAll('.va-card').forEach(function (c) {
+      c.addEventListener('click', function () { openModal(byId[c.dataset.id]); });
+    });
+  }
+
+  renderHero();
+  renderCoverage();
+  renderBoard();
+  wireCards();
   document.getElementById('va-modal').addEventListener('click', function (e) {
     if (e.target === this) this.style.display = 'none';   // click backdrop to close
   });

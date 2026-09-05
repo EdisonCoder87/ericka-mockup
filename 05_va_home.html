@@ -125,8 +125,10 @@
   document.getElementById('train-bar').style.width = (mods.length ? Math.round(doneCount/mods.length*100) : 0) + '%';
   const next = mods.find(m => done.indexOf(m.id) === -1);
   if (next) {
-    const isOnb = next.category === 'onboarding';
-    document.getElementById('next-tag').textContent = isOnb ? 'Onboarding · next up' : 'Training · next up';
+    document.getElementById('next-tag').textContent =
+      next.category === 'onboarding' ? 'Onboarding · next up'
+      : next.category === 'ai' ? '🤖 AI certification · next up'
+      : 'Training · next up';
     document.getElementById('next-mod').textContent = 'Module ' + next.ord + ' · ' + next.title;
     document.getElementById('next-mod-d').textContent = "You're " + doneCount + ' of ' + mods.length + ' modules through your path.';
     document.getElementById('next-link').href = 'module.html?id=' + next.id;
@@ -136,9 +138,13 @@
     document.getElementById('next-mod-d').textContent = "Nice work — you've finished your onboarding and training.";
   }
 
-  // hours this week
+  // hours this week — shown against the roster, the same way the client sees it
   const shifts = await ericka.weekShifts(s.id);
-  document.getElementById('s-hrs').textContent = ericka.sumHours(shifts).toFixed(1);
+  const liveHrs = ericka.sumHoursLive(shifts);
+  const { data: me } = await sb.from('users').select('rostered_hours').eq('id', s.id).maybeSingle();
+  const rostered = Number(me && me.rostered_hours || 0);
+  document.getElementById('s-hrs').textContent =
+    liveHrs.toFixed(1) + (rostered ? ' / ' + rostered.toFixed(0) : '');
 
   // clock in/out state
   const headline = document.getElementById('clock-headline');

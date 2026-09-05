@@ -53,12 +53,13 @@
       <div class="hero-left">
         <div class="hero-label">Remote team</div>
         <h1 class="hero-name">Where everyone's up to</h1>
-        <p class="hero-tagline">Onboarding and training progress across the whole remote team — tap a VA to see their modules.</p>
+        <p class="hero-tagline">Onboarding, training and AI certification across the whole remote team — tap a member to set their roster, enter their week, or sign off a practical.</p>
       </div>
       <div class="hero-right">
-        <div class="stat"><div class="v" id="s-vas">–</div><div class="l">VAs</div></div>
+        <div class="stat"><div class="v" id="s-vas">–</div><div class="l">Members</div></div>
         <div class="stat"><div class="v" id="s-onb">–</div><div class="l">Onboarded</div></div>
         <div class="stat"><div class="v" id="s-trn">–</div><div class="l">Training done</div></div>
+        <div class="stat"><div class="v" id="s-ai">–</div><div class="l">AI certified</div></div>
       </div>
     </div>
   </div>
@@ -85,34 +86,45 @@
   const s = ericka.requireRole(['admin','team_lead','manager']);
   if (!s) return;
   document.getElementById('nav-home').href = ericka.homeFor(s.role);
-  if (s.role === 'admin' || s.role === 'manager')
+  const isOwner = s.role === 'admin';
+  if (isOwner || s.role === 'manager')
     document.getElementById('nav-admin').style.display = '';
 
   const initials = n => n.replace(/\s*\(.*\)$/, '').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
-  const board = await ericka.teamBoard();
+  const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  // Owners see the seeded demo clinics; managers running the real team do not.
+  const board = await ericka.teamBoard(isOwner);
 
-  // Revenue-rate editor (CP & HA bulk-billed values used to auto-calc revenue)
+  // Revenue-rate editor — the values used to auto-calc revenue from bookings.
   const rates = await ericka.perfRates();
+  const RATE_LABELS = {
+    cp_value: 'CP Review $', ha_value: 'Health Assessment $',
+    recall_value: 'Recall visit $', fta_value: 'FTA recovered $', otp_value: 'Unscheduled tx $'
+  };
   const rb = document.getElementById('rates-bar');
-  rb.innerHTML = '<div class="panel" style="padding:16px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">'
-    + '<div style="font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--grey)">Revenue rates (auto-calc)</div>'
-    + '<label style="font-size:12px;font-weight:700;color:var(--grey)">CP Review $ <input id="r-cp" type="number" step="0.01" value="' + rates.cp_value + '" style="width:100px;padding:7px 9px;display:inline-block"></label>'
-    + '<label style="font-size:12px;font-weight:700;color:var(--grey)">Health Assessment $ <input id="r-ha" type="number" step="0.01" value="' + rates.ha_value + '" style="width:100px;padding:7px 9px;display:inline-block"></label>'
-    + '<button id="r-save" class="btn btn-ghost" style="padding:8px 18px">Save rates</button>'
+  rb.innerHTML = '<div class="panel" style="padding:16px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">'
+    + '<div style="font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--grey)">Revenue values (auto-calc)</div>'
+    + ericka.RATE_KEYS.map(k => '<label style="font-size:12px;font-weight:700;color:var(--grey)">' + RATE_LABELS[k]
+        + ' <input id="r-' + k + '" type="number" step="0.01" value="' + rates[k]
+        + '" style="width:96px;padding:7px 9px;display:inline-block"></label>').join('')
+    + '<button id="r-save" class="btn btn-ghost" style="padding:8px 18px">Save values</button>'
     + '<span id="r-msg" style="font-size:13px;color:var(--ok);font-weight:700"></span></div>';
   document.getElementById('r-save').onclick = async function () {
-    const cp = parseFloat(document.getElementById('r-cp').value) || 0;
-    const ha = parseFloat(document.getElementById('r-ha').value) || 0;
-    try { await ericka.savePerfRates(cp, ha); document.getElementById('r-msg').textContent = 'Saved ✓ (reopen to recalc)'; }
-    catch (e) { document.getElementById('r-msg').style.color = 'var(--danger)'; document.getElementById('r-msg').textContent = 'Failed: ' + (e.message||e); }
+    const vals = {};
+    ericka.RATE_KEYS.forEach(k => { vals[k] = parseFloat(document.getElementById('r-' + k).value) || 0; });
+    const msg = document.getElementById('r-msg');
+    try { await ericka.savePerfRates(vals); msg.style.color = 'var(--ok)'; msg.textContent = 'Saved ✓ (reload to recalc)'; }
+    catch (e) { msg.style.color = 'var(--danger)'; msg.textContent = 'Failed: ' + (e.message||e); }
   };
 
   // hero stats
   document.getElementById('s-vas').textContent = board.length;
   const onbFull = board.filter(v => v.onbTotal && v.onbDone === v.onbTotal).length;
   const trnD = board.reduce((t,v)=>t+v.trnDone,0), trnT = board.reduce((t,v)=>t+v.trnTotal,0);
+  const aiCert = board.filter(v => v.badges.some(b => b.earned)).length;
   document.getElementById('s-onb').textContent = onbFull + '/' + board.length;
   document.getElementById('s-trn').textContent = trnT ? Math.round(trnD/trnT*100)+'%' : '0%';
+  document.getElementById('s-ai').textContent  = aiCert + '/' + board.length;
 
   // group by client -> site
   const byId = {};
@@ -126,11 +138,18 @@
     g.vas.push(va);
   });
 
-  function bar(done, total, gold) {
-    const pct = total ? Math.round(done/total*100) : 0;
+  function bar(label, done, total, gold) {
+    if (!total) return '';
+    const pct = Math.round(done/total*100);
     return '<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:var(--grey)"><span>'
-      + (gold?'Training':'Onboarding') + '</span><span>' + done + ' / ' + total + '</span></div>'
+      + label + '</span><span>' + done + ' / ' + total + '</span></div>'
       + '<div class="pbar' + (gold?' gold':'') + '"><span style="width:' + pct + '%"></span></div>';
+  }
+  function paceChip(va) {
+    if (va.pace.state === 'none') return '<span class="chip" style="background:var(--mist);color:var(--grey)">No roster</span>';
+    const map = { behind:['chip-open','behind'], on:['chip-ok','on pace'], ahead:['chip-ok','ahead'] };
+    const m = map[va.pace.state];
+    return '<span class="' + 'chip ' + m[0] + '">' + va.hours.toFixed(1) + ' / ' + va.rostered.toFixed(0) + ' h · ' + m[1] + '</span>';
   }
   function cardHtml(va) {
     const gold = va.vertical === 'medical';
@@ -139,129 +158,210 @@
     const status = onbComplete
       ? '<span class="chip chip-ok">Onboarded</span>'
       : '<span class="chip chip-open">Onboarding</span>';
+    const badges = va.badges.filter(b => b.earned)
+      .map(b => '<span class="chip chip-ok" style="margin-right:6px">' + b.icon + ' ' + b.label + '</span>').join('')
+      + va.badges.filter(b => b.awaitingVerification)
+      .map(b => '<span class="chip chip-open" style="margin-right:6px">' + b.icon + ' sign-off due</span>').join('');
     return '<div class="panel va-card" data-id="' + va.id + '" style="padding:22px">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">'
-      +   '<div class="who"><div class="avatar' + (gold?' gold':'') + '">' + initials(va.name) + '</div><b style="font-size:15px">' + va.name + '</b></div>'
+      +   '<div class="who"><div class="avatar' + (gold?' gold':'') + '">' + initials(va.name) + '</div><b style="font-size:15px">' + esc(va.name) + '</b></div>'
       +   status
       + '</div>'
-      + '<div style="margin-top:16px">' + bar(va.onbDone, va.onbTotal, false) + '</div>'
-      + '<div style="margin-top:14px">' + bar(va.trnDone, va.trnTotal, true) + '</div>'
-      + '<div style="margin-top:14px;display:flex;justify-content:space-between;align-items:center">' + vbadge
-      +   '<span style="font-size:12px;font-weight:700;color:var(--violet)">View modules →</span></div>'
+      + (va.is_demo ? '<div style="margin-top:8px"><span class="chip" style="background:#fdf2e0;color:var(--warn)">Demo account</span></div>' : '')
+      + '<div style="margin-top:16px">' + bar('Onboarding', va.onbDone, va.onbTotal, false) + '</div>'
+      + '<div style="margin-top:14px">' + bar('Training', va.trnDone, va.trnTotal, true) + '</div>'
+      + '<div style="margin-top:14px">' + bar('AI certification', va.aiDone, va.aiTotal, true) + '</div>'
+      + (badges ? '<div style="margin-top:12px">' + badges + '</div>' : '')
+      + '<div style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">'
+      +   paceChip(va) + vbadge + '</div>'
+      + '<div style="margin-top:12px;text-align:right;font-size:12px;font-weight:700;color:var(--violet)">Open →</div>'
       + '</div>';
   }
 
   document.getElementById('board').innerHTML = clients.map(function (c) {
-    return '<div class="client-head">' + c.name + '</div>'
+    return '<div class="client-head">' + esc(c.name) + '</div>'
       + c.sites.map(function (g) {
-          return '<div class="site-head"><span class="pin">📍</span>' + g.name
-               + ' · ' + g.vas.length + ' VA' + (g.vas.length===1?'':'s') + '</div>'
+          return '<div class="site-head"><span class="pin">📍</span>' + esc(g.name)
+               + ' · ' + g.vas.length + ' member' + (g.vas.length===1?'':'s') + '</div>'
                + '<div class="cards c3">' + g.vas.map(cardHtml).join('') + '</div>';
         }).join('');
   }).join('');
 
-  // drill-down modal: onboarding + training checklists
+  // ── drill-down modal ────────────────────────────────────────────────────
   function checklist(mods, cat) {
     const rows = mods.filter(m => m.category === cat);
     if (!rows.length) return '';
-    return '<div class="mini" style="margin:16px 0 6px">' + (cat==='onboarding'?'Onboarding':'Training') + '</div>'
+    const title = cat === 'onboarding' ? 'Onboarding' : (cat === 'training' ? 'Training' : 'AI certification');
+    return '<div class="mini" style="margin:16px 0 6px">' + title + '</div>'
       + rows.map(function (m) {
+          const pending = m.requiresEvidence && m.done && !m.verifiedAt;
+          const state = pending ? 'Sign-off due' : (m.done ? 'Done' : 'To do');
           return '<div class="mod-row ' + (m.done?'done':'todo') + '">'
-            + '<div class="mod-dot ' + (m.done?'done':'todo') + '">' + (m.done?'✓':m.ord) + '</div>'
-            + '<div class="mt">' + m.title + '</div>'
-            + '<div class="ms ' + (m.done?'done':'todo') + '">' + (m.done?'Done':'To do') + '</div></div>';
+            + '<div class="mod-dot ' + (m.done && !pending ?'done':'todo') + '">' + (m.done && !pending ?'✓':m.ord) + '</div>'
+            + '<div class="mt">' + esc(m.title) + '</div>'
+            + '<div class="ms ' + (m.done && !pending ?'done':'todo') + '">' + state + '</div></div>';
         }).join('');
   }
-  function weekLabel() {
-    const d = new Date(); d.setHours(0,0,0,0);
-    d.setDate(d.getDate() - ((d.getDay()+6)%7));   // Monday
-    return 'Week of ' + d.toLocaleDateString('en-AU', {day:'numeric', month:'short', year:'numeric'});
+
+  // Practicals waiting on a manager: the AI badges only light up once these
+  // are verified, so this is the block that actually issues the credential.
+  function verifyBlock(va) {
+    const evi = va.modules.filter(m => m.requiresEvidence && m.evidenceUrl);
+    if (!evi.length) return '';
+    return '<div class="mini" style="margin:18px 0 6px">Practicals submitted</div>'
+      + evi.map(function (m) {
+          const ok = !!m.verifiedAt;
+          return '<div style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px">'
+            + '<div style="font-size:13px;font-weight:700">' + esc(m.title) + '</div>'
+            + '<a href="' + esc(m.evidenceUrl) + '" target="_blank" rel="noopener" '
+            +   'style="font-size:12px;color:var(--violet);word-break:break-all">' + esc(m.evidenceUrl) + '</a>'
+            + '<div style="display:flex;align-items:center;gap:10px;margin-top:8px">'
+            +   '<button class="btn ' + (ok ? 'btn-ghost' : 'btn-primary') + ' js-verify" data-mod="' + m.id + '" data-ok="' + (ok?'0':'1') + '" style="padding:8px 16px;font-size:13px">'
+            +     (ok ? 'Undo sign-off' : 'Verify & certify') + '</button>'
+            +   '<span style="font-size:12px;color:' + (ok ? 'var(--ok)' : 'var(--grey)') + ';font-weight:700">'
+            +     (ok ? 'Verified ' + new Date(m.verifiedAt).toLocaleDateString('en-AU') : 'Awaiting your review') + '</span>'
+            + '</div></div>';
+        }).join('');
+  }
+
+  function rosterBlock(va) {
+    return '<div style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px">'
+      + '<div class="mini" style="margin-bottom:8px">Rostered hours — what this member is contracted to each week</div>'
+      + '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">'
+      +   '<div style="flex:1;min-width:120px"><label style="font-size:11px;font-weight:700;color:var(--grey)">Hours per week</label>'
+      +     '<input id="ros-h" type="number" min="0" max="80" step="0.5" value="' + (va.rostered || '') + '" style="padding:9px 11px"></div>'
+      +   '<button id="ros-save" class="btn btn-ghost" style="padding:10px 20px">Save roster</button>'
+      +   '<span id="ros-msg" style="font-size:13px;font-weight:700;color:var(--ok)"></span>'
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--grey);margin-top:6px">Shown to the client beside actual hours worked, so they can see who is on track.</div>'
+      + '</div>';
+  }
+
+  function lastMonday() {
+    const d = ericka.mondayOf(new Date());
+    d.setDate(d.getDate() - 7);          // reports are retroactive — default to
+    return d;                            // the last COMPLETED week
+  }
+  function toDateInput(d) {
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   }
   function numField(id, label, hint, val) {
     return '<div style="flex:1;min-width:90px"><label style="font-size:11px;font-weight:700;color:var(--grey)">'
       + label + '</label><input id="' + id + '" type="number" min="0" inputmode="numeric" value="' + (val==null?'':val)
-      + '" style="padding:9px 11px"><div style="font-size:10px;color:var(--grey);margin-top:2px">' + hint + '</div></div>';
+      + '" style="padding:9px 11px"><div style="font-size:10px;color:var(--grey);margin-top:2px">' + (hint||'') + '</div></div>';
   }
   function subHead(t) {
     return '<div style="font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--violet);margin:14px 0 6px">' + t + '</div>';
   }
+  // The entry form is generated from the vertical's metric set — a dental
+  // clinic never sees Care Plan Review, and a GP never sees recalls.
   function prodForm(va) {
     const p = va.productivity || {};
+    const set = ericka.metricSet(va.vertical);
+    const wk = p.period_start ? new Date(p.period_start + 'T00:00:00') : lastMonday();
     return '<div style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px">'
-      + '<div class="mini" style="margin-bottom:8px">Productivity — enter from 3CX / HotDoc / Pracsoft (revenue auto-calculates)</div>'
-      + '<label style="font-size:11px;font-weight:700;color:var(--grey)">Period</label>'
-      + '<input id="p-period" value="' + (p.period_label || weekLabel()) + '" style="padding:9px 11px;margin-bottom:4px">'
-      + subHead('Inbound')
-      + '<div style="display:flex;gap:10px;flex-wrap:wrap">'
-      +   numField('p-calls_inbound','Calls inbound','3CX', p.calls_inbound)
-      +   numField('p-scans','Scans','', p.scans)
-      + '</div>'
-      + subHead('Outbound · Confirmation')
-      + '<div style="display:flex;gap:10px;flex-wrap:wrap">'
-      +   numField('p-confirmation_calls','Confirmation calls','', p.confirmation_calls)
-      + '</div>'
-      + subHead('Outbound · Arrears')
-      + '<div style="display:flex;gap:10px;flex-wrap:wrap">'
-      +   numField('p-arrears_total','Calls','total', p.arrears_total)
-      +   numField('p-arrears_answered','Pt answered','picked up', p.arrears_answered)
-      +   numField('p-arrears_collected','Collected $','entered', p.arrears_collected)
-      + '</div>'
-      + subHead('Outbound · Care Plan Review')
-      + '<div style="display:flex;gap:10px;flex-wrap:wrap">'
-      +   numField('p-cpr_total','Calls','total', p.cpr_total)
-      +   numField('p-cpr_picked_up','Picked up','', p.cpr_picked_up)
-      +   numField('p-cpr_booked','Booked','→ revenue', p.cpr_booked)
-      + '</div>'
-      + subHead('Outbound · Health Assessment')
-      + '<div style="display:flex;gap:10px;flex-wrap:wrap">'
-      +   numField('p-ha_due','Due','count', p.ha_due)
-      +   numField('p-ha_picked_up','Picked up','', p.ha_picked_up)
-      +   numField('p-ha_booked','Booked','→ revenue', p.ha_booked)
-      + '</div>'
+      + '<div class="mini" style="margin-bottom:8px">' + set.label + ' performance — ' + set.source + ' (revenue auto-calculates)</div>'
+      + '<label style="font-size:11px;font-weight:700;color:var(--grey)">Week starting (Monday)</label>'
+      + '<input id="p-week" type="date" value="' + toDateInput(wk) + '" style="padding:9px 11px">'
+      + '<div id="p-weeklabel" style="font-size:11px;color:var(--grey);margin-top:4px"></div>'
+      + set.groups.map(function (g) {
+          return subHead(g.name) + '<div style="display:flex;gap:10px;flex-wrap:wrap">'
+            + g.fields.map(f => numField('p-' + f.k, f.label, f.hint, p[f.k])).join('') + '</div>';
+        }).join('')
       + '<label style="font-size:11px;font-weight:700;color:var(--grey);margin-top:12px;display:block">Notes (optional)</label>'
-      + '<input id="p-notes" value="' + (p.notes ? String(p.notes).replace(/"/g,'&quot;') : '') + '" style="padding:9px 11px">'
+      + '<input id="p-notes" value="' + esc(p.notes || '') + '" style="padding:9px 11px">'
       + '<div style="display:flex;align-items:center;gap:12px;margin-top:14px">'
-      +   '<button id="p-save" class="btn btn-primary" style="padding:11px 24px">Save productivity</button>'
+      +   '<button id="p-save" class="btn btn-primary" style="padding:11px 24px">Save performance</button>'
       +   '<span id="p-msg" style="font-size:13px;color:var(--ok);font-weight:700"></span>'
       + '</div>'
       + (p.updated_at ? '<div style="font-size:11px;color:var(--grey);margin-top:8px">Last updated ' + new Date(p.updated_at).toLocaleString('en-AU') + '</div>' : '')
       + '</div>';
   }
+
   function openModal(va) {
     const gold = va.vertical === 'medical';
     document.getElementById('modal-body').innerHTML =
-      '<div class="who" style="margin-bottom:4px"><div class="avatar' + (gold?' gold':'') + '">' + initials(va.name) + '</div><b style="font-size:18px">' + va.name + '</b></div>'
-      + '<div style="font-size:13px;color:var(--grey);margin-bottom:6px">' + va.client + ' · 📍 ' + va.site + ' · ' + (gold?'Medical':'Dental') + '</div>'
+      '<div class="who" style="margin-bottom:4px"><div class="avatar' + (gold?' gold':'') + '">' + initials(va.name) + '</div><b style="font-size:18px">' + esc(va.name) + '</b></div>'
+      + '<div style="font-size:13px;color:var(--grey);margin-bottom:6px">' + esc(va.client) + ' · 📍 ' + esc(va.site) + ' · ' + (gold?'Medical':'Dental') + '</div>'
       + checklist(va.modules, 'onboarding')
       + checklist(va.modules, 'training')
+      + checklist(va.modules, 'ai')
+      + verifyBlock(va)
+      + rosterBlock(va)
       + (ericka.isGeneralVA(va)
           ? '<div style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px;font-size:13px;color:var(--grey)">General VA — no performance tracking.</div>'
           : prodForm(va));
     document.getElementById('va-modal').style.display = 'flex';
 
+    // roster
+    const rsave = document.getElementById('ros-save');
+    if (rsave) rsave.onclick = async function () {
+      const msg = document.getElementById('ros-msg');
+      const h = parseFloat(document.getElementById('ros-h').value) || 0;
+      try {
+        await ericka.updateMember(va.id, { rostered_hours: h });
+        va.rostered = h; va.pace = ericka.paceFor(va.hours, h);
+        msg.style.color = 'var(--ok)'; msg.textContent = 'Saved ✓';
+      } catch (e) { msg.style.color = 'var(--danger)'; msg.textContent = 'Failed: ' + (e.message || e); }
+    };
+
+    // practical verification
+    document.querySelectorAll('.js-verify').forEach(function (btn) {
+      btn.onclick = async function () {
+        btn.disabled = true;
+        const ok = btn.dataset.ok === '1';
+        try {
+          await ericka.verifyEvidence(va.id, btn.dataset.mod, s.id, ok);
+          const m = va.modules.find(x => x.id === btn.dataset.mod);
+          if (m) m.verifiedAt = ok ? new Date().toISOString() : null;
+          openModal(va);              // re-render so the badge state updates
+        } catch (e) { alert('Could not save: ' + (e.message || e)); btn.disabled = false; }
+      };
+    });
+
+    // performance entry
+    const wkInput = document.getElementById('p-week');
+    const wkLabel = document.getElementById('p-weeklabel');
+    function refreshWeekLabel() {
+      if (!wkInput || !wkLabel) return;
+      const d = new Date(wkInput.value + 'T00:00:00');
+      wkLabel.textContent = isNaN(d) ? '' : 'Saved as "' + ericka.weekLabelFor(d) + '"';
+    }
+    if (wkInput) { wkInput.addEventListener('change', refreshWeekLabel); refreshWeekLabel(); }
+
     const save = document.getElementById('p-save');
     if (save) save.onclick = async function () {
       save.disabled = true; save.textContent = 'Saving…';
-      const val = f => {
-        const raw = document.getElementById('p-' + f).value;
-        return f === 'arrears_collected' ? (parseFloat(raw) || 0) : (parseInt(raw, 10) || 0);
-      };
+      const set = ericka.metricSet(va.vertical);
+      const fields = [];
+      set.groups.forEach(g => g.fields.forEach(f => fields.push(f)));
+      const d = new Date(wkInput.value + 'T00:00:00');
+      const monday = isNaN(d) ? ericka.mondayOf(lastMonday()) : ericka.mondayOf(d);
       const payload = {
         userId: va.id, clientId: va.client_id,
-        period: document.getElementById('p-period').value.trim() || weekLabel(),
+        period: ericka.weekLabelFor(monday),
+        periodStart: toDateInput(monday),
         notes: document.getElementById('p-notes').value.trim(), by: s.id
       };
-      const local = { period_label: payload.period, notes: payload.notes, updated_at: new Date().toISOString() };
-      ericka.PROD_FIELDS.forEach(f => { payload[f] = val(f); local[f] = val(f); });
+      const local = { period_label: payload.period, period_start: payload.periodStart,
+                      notes: payload.notes, updated_at: new Date().toISOString() };
+      // Only the fields this vertical actually collects are written; the rest
+      // stay at their defaults rather than being zeroed by the other set.
+      fields.forEach(function (f) {
+        const raw = document.getElementById('p-' + f.k).value;
+        const v = f.money ? (parseFloat(raw) || 0) : (parseInt(raw, 10) || 0);
+        payload[f.k] = v; local[f.k] = v;
+      });
       try {
         await ericka.saveProductivity(payload);
-        va.productivity = local;   // reflect locally for a re-open
+        va.productivity = local;
+        document.getElementById('p-msg').style.color = 'var(--ok)';
         document.getElementById('p-msg').textContent = 'Saved ✓';
       } catch (e) {
         document.getElementById('p-msg').style.color = 'var(--danger)';
         document.getElementById('p-msg').textContent = 'Failed: ' + (e.message || e);
       }
-      save.disabled = false; save.textContent = 'Save productivity';
+      save.disabled = false; save.textContent = 'Save performance';
     };
   }
   document.querySelectorAll('.va-card').forEach(function (c) {

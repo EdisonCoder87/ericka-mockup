@@ -71,9 +71,11 @@
   if (!mod) { document.getElementById('mtitle').textContent = 'Module not found'; return; }
 
   const isOnb = mod.category === 'onboarding';
+  const isAI  = mod.category === 'ai';
   const tag = document.getElementById('mtag');
-  tag.textContent = (isOnb ? 'Onboarding' : 'Training') + ' · Module ' + mod.ord;
-  tag.className = 'chip ' + (isOnb ? 'chip-dental' : 'chip-medical');
+  const tierLabel = mod.tier === 'builder' ? 'AI Builder' : 'AI Assisted';
+  tag.textContent = (isAI ? '🤖 ' + tierLabel : (isOnb ? 'Onboarding' : 'Training')) + ' · Module ' + mod.ord;
+  tag.className = 'chip ' + (isAI ? 'chip-ok' : (isOnb ? 'chip-dental' : 'chip-medical'));
   document.getElementById('mtitle').textContent = mod.title;
   document.getElementById('msum').textContent = mod.summary || '';
 
@@ -83,19 +85,54 @@
   }).join('');
 
   // completion state + action (only VAs mark their own progress)
-  const done = new Set(await ericka.progressFor(s.id));
-  const isDone = done.has(mod.id);
+  const rows = await ericka.progressRowsFor(s.id);
+  const myRow = rows.get(mod.id) || null;
+  const isDone = !!myRow;
   if (isDone) document.getElementById('done-banner').style.display = 'block';
 
   const cta = document.getElementById('cta');
   const PASS = 75;             // percent needed to pass
-  const backHome = isOnb ? '05_va_home.html' : '06_va_training.html';
+  const backHome = isAI ? '06_va_training.html' : (isOnb ? '05_va_home.html' : '06_va_training.html');
 
   if (s.role !== 'va') {
     cta.innerHTML = '<p style="color:var(--grey);font-size:13px">Manager view — read only.</p>';
     return;
   }
-  if (isDone) return;          // already complete, nothing to do
+
+  // A module that needs a practical isn't finished when the quiz passes — the
+  // member submits their work and a manager signs it off. That verification is
+  // what makes the AI badge worth something to a client.
+  function renderEvidence() {
+    const r = rows.get(mod.id);
+    const url = r && r.evidence_url, ok = r && r.verified_at;
+    document.getElementById('cta').insertAdjacentHTML('beforeend',
+      '<div class="quiz" style="margin-top:16px"><h3>Your practical</h3>'
+      + '<p style="color:var(--grey);font-size:13.5px;line-height:1.6;margin-bottom:12px">'
+      +   (mod.evidence_prompt || 'Submit a link to your work for your manager to review.') + '</p>'
+      + (ok
+          ? '<div class="quiz-result pass">Verified by your manager — badge earned 🎉</div>'
+          : (url ? '<div class="quiz-result fail">Submitted — waiting on your manager to sign it off.</div>' : ''))
+      + '<label style="font-size:11px;font-weight:700;color:var(--grey)">Link to your work</label>'
+      + '<input id="evi-url" type="url" placeholder="https://…" value="' + (url || '') + '" style="padding:11px 12px">'
+      + '<div style="display:flex;align-items:center;gap:12px;margin-top:12px">'
+      +   '<button id="evi-save" class="btn btn-primary" style="padding:12px 28px">'
+      +     (url ? 'Update my submission' : 'Submit for review') + '</button>'
+      +   '<span id="evi-msg" style="font-size:13px;font-weight:700"></span>'
+      + '</div></div>');
+    document.getElementById('evi-save').onclick = async function () {
+      const msg = document.getElementById('evi-msg');
+      try {
+        await ericka.submitEvidence(s.id, mod.id, document.getElementById('evi-url').value);
+        msg.style.color = 'var(--ok)'; msg.textContent = 'Sent to your manager ✓';
+      } catch (e) { msg.style.color = 'var(--danger)'; msg.textContent = e.message || 'Could not save'; }
+    };
+  }
+
+  if (isDone) {
+    // The quiz is behind them; the practical may still be outstanding.
+    if (mod.requires_evidence) renderEvidence();
+    return;
+  }
 
   const quiz = await ericka.quizFor(mod.id);
 
@@ -108,7 +145,11 @@
     btn.onclick = async function () {
       btn.disabled = true; btn.textContent = 'Saving…';
       await ericka.completeModule(s.id, mod.id);
-      location.href = backHome;
+      if (!mod.requires_evidence) { location.href = backHome; return; }
+      const fresh = await ericka.progressRowsFor(s.id);
+      rows.set(mod.id, fresh.get(mod.id) || { module_id: mod.id });
+      cta.innerHTML = '';
+      renderEvidence();
     };
     cta.appendChild(btn);
     return;
@@ -163,8 +204,14 @@
       result.textContent = 'Passed — ' + pct + '% (' + correct + '/' + quiz.length + '). Saving…';
       const btn = document.getElementById('q-submit');
       btn.disabled = true;
-      ericka.completeModule(s.id, mod.id, pct).then(function () {
-        location.href = backHome;
+      ericka.completeModule(s.id, mod.id, pct).then(async function () {
+        if (!mod.requires_evidence) { location.href = backHome; return; }
+        // Practical modules stay on the page so the member can submit their work.
+        const fresh = await ericka.progressRowsFor(s.id);
+        rows.set(mod.id, fresh.get(mod.id) || { module_id: mod.id });
+        document.getElementById('cta').innerHTML =
+          '<div class="quiz-result pass">Quiz passed — ' + pct + '%. One step left: submit your practical.</div>';
+        renderEvidence();
       });
     } else {
       result.className = 'quiz-result fail';

@@ -64,6 +64,12 @@
       <div class="panel" style="padding:24px;color:var(--grey)">Loading…</div>
     </div>
 
+    <div class="section-h">🤖 AI certification <span id="ai-sub">two levels · earn the badge your clinic can see</span></div>
+    <div id="ai-badges" style="margin-bottom:14px"></div>
+    <div class="cards c3" id="ai-cards">
+      <div class="panel" style="padding:24px;color:var(--grey)">Loading…</div>
+    </div>
+
   </div>
 </div>
 
@@ -90,11 +96,13 @@
   const allMods = await ericka.modulesFor(s.vertical);
   const onb = allMods.filter(m => m.category === 'onboarding');
   const trn = allMods.filter(m => m.category === 'training');
-  const done = new Set(await ericka.progressFor(s.id));
+  const ai  = allMods.filter(m => m.category === 'ai');
+  const rows = await ericka.progressRowsFor(s.id);
+  const done = new Set(rows.keys());
 
   const doneCount = allMods.filter(m => done.has(m.id)).length;
   document.getElementById('track-count').textContent =
-    onb.length + ' onboarding · ' + trn.length + ' training modules';
+    onb.length + ' onboarding · ' + trn.length + ' training · ' + ai.length + ' AI certification modules';
   document.getElementById('prog-bar').style.width =
     (allMods.length ? Math.round(doneCount/allMods.length*100) : 0) + '%';
   document.getElementById('prog-text').textContent = doneCount + ' of ' + allMods.length + ' complete';
@@ -122,6 +130,25 @@
   }
   renderTrack('onb-cards', onb);
   renderTrack('trn-cards', trn);
+  // The AI track runs in its own sequence, so it doesn't stay locked behind
+  // the clinical training — it is a separate credential.
+  renderTrack('ai-cards', ai);
+
+  // Badge strip: what you have earned, and what is still needed.
+  const badges = ericka.AI_TIERS.map(function (t) {
+    const set  = ai.filter(m => m.tier === t.tier);
+    const doneN = set.filter(m => done.has(m.id)).length;
+    const evi  = set.filter(m => m.requires_evidence);
+    const verified = evi.length > 0 && evi.every(m => { const r = rows.get(m.id); return r && r.verified_at; });
+    const submitted = evi.some(m => { const r = rows.get(m.id); return r && r.evidence_url && !r.verified_at; });
+    if (verified && doneN === set.length)
+      return '<span class="chip chip-ok" style="margin-right:8px;padding:8px 16px;font-size:13px">' + t.icon + ' ' + t.label + ' · earned</span>';
+    if (submitted)
+      return '<span class="chip chip-open" style="margin-right:8px;padding:8px 16px;font-size:13px">' + t.icon + ' ' + t.label + ' · with your manager</span>';
+    return '<span class="chip" style="background:var(--mist);color:var(--violet-d);margin-right:8px;padding:8px 16px;font-size:13px">'
+      + t.icon + ' ' + t.label + ' · ' + doneN + ' of ' + set.length + '</span>';
+  }).join('');
+  document.getElementById('ai-badges').innerHTML = badges;
 })();
 </script>
 </body>

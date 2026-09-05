@@ -106,7 +106,9 @@
 
   async function refresh() {
     const shifts = await ericka.weekShifts(s.id);
-    const hours = ericka.sumHours(shifts);
+    // Counts the shift in progress up to now, so this matches the figure the
+    // client sees against your roster. The log below still shows it as open.
+    const hours = ericka.sumHoursLive(shifts);
     document.getElementById('ts-hours').textContent = hours.toFixed(1);
     document.getElementById('ts-shifts').textContent = shifts.length;
     document.getElementById('ts-days').textContent =
