@@ -24,6 +24,7 @@ SUPABASE_PAT=sbp_… node run_migrations.js <file.sql>
 | 12 | `migration_12_ai_quizzes.sql` | quizzes for the AI track |
 | 13 | `migration_13_demo_clinics.sql` | the two demo clinics Grace demos from |
 | 14 | `migration_14_period_key.sql` | keys a performance row on its week, not its label |
+| 15 | `migration_15_hide_pin_and_pay.sql` | public key can no longer read `pin` or `pay_rate` |
 
 **⚠️ Never re-run 05 or 06** — they drop the `productivity` table.
 **⚠️ Never re-run 03 or 04 after 11/12** — they wipe *all* module content / quizzes, AI track included.
@@ -88,8 +89,10 @@ lights once that is verified — a badge a quiz alone can mint is worth nothing 
 ## Known debt
 - **No RLS yet.** Fine while every client is friendly. Before an arm's-length paying client
   gets a login: switch on Supabase Auth + Row-Level Security (the schema is RLS-ready).
-  The anon key can still read `pay_rate` — and `pin` — directly, so a shared starting PIN
-  isn't what's holding the door shut either way. RLS is.
+  Migration 15 closed the sharpest edge — the public key can no longer read `pin` or
+  `pay_rate`, so nobody can lift Ericka's margin off the page — but it can still read
+  `billable_rate`, and it can still WRITE to the tables the browser writes to. Those need
+  real logins the database can verify, not app-level role checks.
 - **3CX numbers are typed in.** Send one real weekly report and the entry form can take a
   paste/upload instead.
 - **Practical sign-off is enforced in the app, not the database.** With RLS off, the public

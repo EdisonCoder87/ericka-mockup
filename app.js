@@ -52,16 +52,18 @@
   }
 
   /* ---- login ------------------------------------------------------------ */
+  // The PIN check happens INSIDE the database (check_login, migration 15).
+  // anon has no read access to users.pin or users.pay_rate, so the browser
+  // can't pull PINs or pay economics even though the key is public.
   async function login(name, pin) {
-    const { data, error } = await sb
-      .from("users")
-      .select("id,name,role,client_id,vertical,active")
-      .eq("name", name).eq("pin", String(pin)).eq("active", true)
-      .maybeSingle();
+    const { data, error } = await sb.rpc("check_login", {
+      p_name: name, p_pin: String(pin)
+    });
     if (error) throw error;
-    if (!data) return null;
-    setSession(data);
-    return data;
+    const user = Array.isArray(data) ? data[0] : data;
+    if (!user) return null;
+    setSession(user);
+    return user;
   }
 
   /* ---- dates ------------------------------------------------------------ */
