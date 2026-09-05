@@ -63,8 +63,8 @@
       </div>
       <div class="hero-right">
         <div class="stat"><div class="v" id="s-vas">–</div><div class="l">Your VAs</div></div>
-        <div class="stat"><div class="v" id="s-on">–</div><div class="l">On right now</div></div>
-        <div class="stat"><div class="v" id="s-hrs">–</div><div class="l" id="s-hrs-l">Hrs this wk</div></div>
+        <div class="stat"><div class="v" id="s-on">–</div><div class="l">On now</div></div>
+        <div class="stat"><div class="v" id="s-hrs">–</div><div class="l" id="s-hrs-l">Hours this week</div></div>
         <div class="stat"><div class="v" id="s-ai">–</div><div class="l">AI certified</div></div>
       </div>
     </div>
@@ -133,7 +133,7 @@
     document.getElementById('s-vas').textContent = board.length;
     document.getElementById('s-on').textContent  = onNow;
     document.getElementById('s-hrs').textContent = liveHrs.toFixed(0) + (rost ? ' / ' + rost.toFixed(0) : '');
-    document.getElementById('s-hrs-l').textContent = rost ? 'Hrs this wk / rostered' : 'Hrs this wk';
+    document.getElementById('s-hrs-l').textContent = rost ? 'Hours vs roster' : 'Hours this week';
     document.getElementById('s-ai').textContent  = certified + ' / ' + board.length;
   }
 
