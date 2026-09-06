@@ -134,6 +134,21 @@ what puts them in a seat: they clock on, their hours bill, and they appear on th
 client board and the roster like anyone else — while keeping the approval power.
 They approve their own hours because `manager_id` points at themselves.
 
+### The roster is STANDING — it already repeats
+`roster_shifts` stores a **weekday**, not a date. Set someone's pattern once and it applies
+every week from then on; nobody re-enters it weekly. Change it only when a person's regular
+days actually change. **Copy from…** on each row clones a colleague's pattern, so setting up
+a team who work the same days is one click per person.
+
+Shane and Sharica each have their **own** roster row (they hold seats), alongside the people
+they manage.
+
+**A one-off extra shift does not go in the roster.** The VA just clocks the hours; the week
+then reads as over-roster on Approvals, and Shane clears it by recording Rad's or Nikki's
+authorisation. That keeps the base roster stable and every extra hour evidenced — putting
+one-offs in the roster would permanently raise the ceiling that the authorisation gate
+depends on.
+
 ### Rostered hours are DERIVED
 Save a roster on `09_roster.html` and the weekly total is written back to
 `users.rostered_hours`. There is deliberately **no** hours input on the admin page any

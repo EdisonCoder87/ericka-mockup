@@ -40,6 +40,10 @@
   .addbtn{border:1.5px dashed var(--line);background:none;border-radius:7px;color:var(--grey);
     font-size:17px;cursor:pointer;padding:3px 0;font-weight:400}
   .addbtn:hover{border-color:var(--violet);color:var(--violet);background:#faf7ff}
+  .copybtn{margin-top:6px;border:1px solid var(--line);background:#fff;border-radius:6px;
+    font-size:10.5px;font-weight:700;color:var(--grey);cursor:pointer;padding:3px 8px;
+    font-family:var(--f-body)}
+  .copybtn:hover{border-color:var(--violet);color:var(--violet)}
   .sitetabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
   .sitetab{padding:9px 18px;border-radius:var(--r-pill);border:1px solid var(--line);background:#fff;
     font-size:13px;font-weight:600;color:var(--grey);cursor:pointer;font-family:var(--f-body)}
@@ -82,14 +86,17 @@
   <div class="phead">
     <div class="phead-inner">
       <div>
-        <h1>Roster</h1>
-        <div class="sub" id="r-sub">Who is on, and when</div>
+        <h1>Standing Roster</h1>
+        <div class="sub" id="r-sub">The regular weekly schedule — repeats every week</div>
       </div>
       <span class="chip chip-medical" id="r-total" style="padding:9px 18px;font-size:13px">—</span>
     </div>
   </div>
 
   <div class="wrap">
+    <div id="standing-note" style="background:var(--mist);border-left:4px solid var(--violet);
+      padding:13px 18px;border-radius:var(--r-md);font-size:13.5px;color:var(--violet-dd);
+      margin-bottom:20px;line-height:1.55"></div>
     <div class="sitetabs" id="site-tabs"></div>
     <div class="rscroll"><div class="rgrid" id="grid"><div style="padding:26px;color:var(--grey)">Loading…</div></div></div>
     <p style="font-size:12px;color:var(--grey);margin-top:14px" id="r-foot"></p>
@@ -232,7 +239,10 @@
         const wk = mine.reduce((t, sh) => t + ericka.shiftLength(sh), 0);
         html += '<div class="rname"><b>' + esc(p.name) + '</b><span class="s">' +
           (p.is_operator ? 'Manager · on a seat' : (p.vertical === 'dental' ? 'Dental' : 'Medical')) +
-          ' · ' + (wk ? wk.toFixed(2).replace(/\.?0+$/, '') + 'h' : 'no roster') + '</span></div>';
+          ' · ' + (wk ? wk.toFixed(2).replace(/\.?0+$/, '') + 'h / wk' : 'no roster') + '</span>' +
+          (editable ? '<button class="copybtn" data-copy="' + p.id + '">' +
+             (wk ? 'Clear' : 'Copy from…') + '</button>' : '') +
+          '</div>';
         for (let d = 0; d < DAYS; d++) {
           const todays = mine.filter(sh => sh.weekday === d);
           html += '<div class="rcell">' + todays.map(sh => shiftCard(p, sh)).join('') +
@@ -252,7 +262,22 @@
         '. Their client card reads "No roster set" until a shift is added here.'
       : 'Weekly totals feed straight through to each person’s card on the client portal.';
 
+    document.getElementById('standing-note').innerHTML = editable
+      ? '<b>This is the standing roster.</b> Whatever you set here repeats <b>every week</b> — ' +
+        'nobody has to re-enter it. Change it only when someone\'s regular days actually change, ' +
+        'and it applies from that moment forward.<br>' +
+        'A <b>one-off extra shift</b> doesn\'t belong here: the VA simply clocks the hours, and you ' +
+        'clear them on <a href="12_approvals.html" style="color:var(--violet-d)"><b>Approvals</b></a> ' +
+        'by recording Rad or Nikki\'s authorisation for that week. That keeps the base roster stable ' +
+        'and the extra time evidenced.'
+      : '<b>The standing roster</b> — your team\'s regular weekly schedule. Hours worked above it ' +
+        'appear on each person\'s card and are only billed once authorised.';
+
     if (!editable) return;
+    grid.querySelectorAll('[data-copy]').forEach(b => b.onclick = function () {
+      const p = people.find(x => x.id === this.dataset.copy);
+      if ((roster.get(p.id) || []).length) clearRoster(p); else openCopy(p);
+    });
     grid.querySelectorAll('[data-add]').forEach(b => b.onclick = function () {
       openAdd(people.find(p => p.id === this.dataset.add), Number(this.dataset.day));
     });
@@ -328,6 +353,53 @@
     };
   }
 
+  // Most of the team works the same pattern, so setting up the sixth person
+  // should be one click off the first — not five modals.
+  function openCopy(p) {
+    const sources = people.filter(x => x.id !== p.id && (roster.get(x.id) || []).length);
+    document.getElementById('sm-body').innerHTML =
+      '<div class="mini">Copy a standing roster</div>' +
+      '<div style="font-family:var(--f-display);font-weight:600;font-size:20px;margin:2px 0 12px">' +
+        esc(p.name) + '</div>' +
+      (sources.length
+        ? '<label class="mini">Copy whose pattern?</label>' +
+          '<select id="cp-src" style="padding:10px 11px">' + sources.map(x =>
+            '<option value="' + x.id + '">' + esc(x.name) + ' · ' +
+            ericka.rosterByDay(roster.get(x.id)).reduce((a,b) => a+b, 0)
+              .toFixed(2).replace(/\.?0+$/, '') + 'h</option>').join('') + '</select>' +
+          '<p style="font-size:11.5px;color:var(--grey);margin-top:10px">Copies their weekly ' +
+            'pattern onto ' + esc(p.name) + '. You can adjust individual days afterwards.</p>' +
+          '<div style="display:flex;align-items:center;gap:12px;margin-top:16px">' +
+            '<button id="cp-save" class="btn btn-primary" style="padding:11px 24px">Copy roster</button>' +
+            '<span id="cp-msg" style="font-size:13px;font-weight:700"></span></div>'
+        : '<p style="font-size:13px;color:var(--grey)">Nobody has a roster set yet to copy from. ' +
+          'Build the first one with the <b>+</b> buttons — after that you can copy it onto everyone ' +
+          'who works the same pattern.</p>');
+    document.getElementById('shift-modal').style.display = 'flex';
+    const btn = document.getElementById('cp-save');
+    if (btn) btn.onclick = async function () {
+      const src = document.getElementById('cp-src').value;
+      const msg = document.getElementById('cp-msg');
+      this.disabled = true;
+      try {
+        await ericka.saveRoster(p.id, (roster.get(src) || []).map(x =>
+          ({ weekday: x.weekday, start_time: x.start_time, end_time: x.end_time })));
+        document.getElementById('shift-modal').style.display = 'none';
+        await load();
+      } catch (e) {
+        msg.style.color = 'var(--danger)'; msg.textContent = e.message || String(e);
+        this.disabled = false;
+      }
+    };
+  }
+
+  async function clearRoster(p) {
+    if (!confirm('Clear ' + p.name + '\'s standing roster?\n\nTheir card will read "No roster set" ' +
+                 'and Approvals will have nothing to check their hours against until a new one is set.')) return;
+    try { await ericka.saveRoster(p.id, []); await load(); }
+    catch (e) { alert('Could not clear that roster: ' + (e.message || e)); }
+  }
+
   async function removeShift(id) {
     let owner = null;
     roster.forEach((list, vaId) => { if (list.some(x => x.id === id)) owner = vaId; });
@@ -339,8 +411,8 @@
   }
 
   document.getElementById('r-sub').textContent = editable
-    ? 'Set who is on, and when — totals flow to the client portal'
-    : 'Your remote team’s rostered week';
+    ? 'The regular weekly schedule — set once, repeats every week'
+    : 'Your remote team’s regular weekly schedule';
   load();
 })();
 </script>
