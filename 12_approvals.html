@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Approvals — Ericka Portal</title>
+<link rel="stylesheet" href="ericka.css">
+<style>
+  .mini{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grey)}
+  .pcard{background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow-sm);
+    margin-bottom:18px;overflow:hidden}
+  .pcard > .ph{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;
+    padding:15px 20px;border-bottom:1px solid var(--line);background:var(--cream)}
+  .pcard .who b{font-size:15.5px}
+  .pcard .who .s{font-size:12px;color:var(--grey)}
+  .srow{display:flex;align-items:center;gap:12px;padding:11px 20px;border-bottom:1px solid var(--line);
+    flex-wrap:wrap}
+  .srow:last-child{border-bottom:none}
+  .srow .day{width:74px;font-size:12.5px;font-weight:700;color:var(--ink);flex-shrink:0}
+  .srow .times{font-size:13px;color:var(--ink);min-width:150px;flex:1}
+  .srow .hrs{font-family:var(--f-display);font-weight:600;font-size:16px;width:56px;text-align:right}
+  .srow.done{background:#f6fbf8}
+  .tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:3px 9px;
+    border-radius:var(--r-pill)}
+  .tag.ok{background:#e4f4ec;color:var(--ok)}
+  .tag.pend{background:#fdf3e2;color:var(--warn)}
+  .tag.open{background:var(--mist);color:var(--violet)}
+  .tag.edit{background:#efe8fa;color:var(--violet)}
+  .rowbtn{padding:7px 14px;font-size:12.5px;font-weight:700;border-radius:8px;border:1px solid var(--line);
+    background:#fff;cursor:pointer;color:var(--ink);font-family:var(--f-body)}
+  .rowbtn:hover{border-color:var(--violet);color:var(--violet)}
+  .rowbtn:disabled{opacity:.45;cursor:not-allowed}
+  .rowbtn.go{background:var(--ok);border-color:var(--ok);color:#fff}
+  .rowbtn.go:hover{opacity:.9;color:#fff}
+  .warnbar{background:#fdf3e2;border-left:4px solid var(--warn);padding:11px 20px;font-size:13px;
+    color:#7a4a00;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+  .okbar{background:#e4f4ec;border-left:4px solid var(--ok);padding:9px 20px;font-size:12.5px;color:#1f6b45}
+  .modal-back{position:fixed;inset:0;background:rgba(36,27,51,.55);display:flex;align-items:center;
+    justify-content:center;padding:20px;z-index:200}
+  .modal-card{background:#fff;border-radius:var(--r-xl);box-shadow:var(--shadow-lg);width:100%;
+    max-width:460px;max-height:88vh;overflow:auto;padding:26px;position:relative}
+  .modal-x{position:absolute;top:14px;right:16px;border:none;background:none;font-size:26px;
+    color:var(--grey);cursor:pointer}
+  @media(max-width:640px){ .srow .day{width:100%} .srow .hrs{width:auto} }
+</style>
+</head>
+<body>
+
+<input type="checkbox" id="navtog">
+<div class="app-topbar">
+  <label class="burger" for="navtog"><span></span><span></span><span></span></label>
+  <div class="wm rev">Erick<span class="a">a</span></div>
+</div>
+
+<nav class="app-sidebar">
+  <div class="sidebar-brand">
+    <div class="wm rev">Erick<span class="a">a</span></div>
+    <svg class="pulse" viewBox="0 0 90 14" preserveAspectRatio="none"><path d="M2 7 H32 l4 -5 l5 10 l4 -8 l3 3 H88"/></svg>
+  </div>
+  <div class="nav-group-label">Manage</div>
+  <a id="nav-home" href="02_home.html" style="display:none"><span class="ic">🏠</span> Home</a>
+  <a href="10_team.html"><span class="ic">👥</span> Team</a>
+  <a href="09_roster.html"><span class="ic">🗓️</span> Roster</a>
+  <a href="12_approvals.html" class="active"><span class="ic">✅</span> Approvals</a>
+  <a id="nav-mine" href="07_va_timesheet.html" style="display:none"><span class="ic">🕑</span> My Timesheet</a>
+  <a href="13_export.html"><span class="ic">📤</span> Pay Cycle</a>
+  <a href="performance.html"><span class="ic">📊</span> Performance</a>
+  <a id="nav-admin" href="11_admin.html" style="display:none"><span class="ic">⚙️</span> Admin</a>
+  <a href="01_welcome.html" class="logout" onclick="ericka.logout();return false;"><span class="ic">↩</span> Sign out</a>
+</nav>
+
+<div class="page">
+  <div class="phead">
+    <div class="phead-inner">
+      <div>
+        <h1>Approvals</h1>
+        <div class="sub" id="a-sub">Sign off your team's hours</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-ghost" id="wk-prev" style="padding:9px 14px">◀</button>
+        <span class="chip chip-medical" id="wk-label" style="padding:9px 16px;font-size:13px">—</span>
+        <button class="btn btn-ghost" id="wk-next" style="padding:9px 14px">▶</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="cards c3" style="margin-bottom:24px">
+      <div class="panel" style="padding:18px 20px"><div class="mini">Awaiting you</div>
+        <div style="font-family:var(--f-display);font-weight:600;font-size:30px;margin-top:2px;color:var(--warn)" id="k-pend">–</div>
+        <div style="font-size:12px;color:var(--grey)">shifts to approve</div></div>
+      <div class="panel" style="padding:18px 20px"><div class="mini">Approved</div>
+        <div style="font-family:var(--f-display);font-weight:600;font-size:30px;margin-top:2px;color:var(--ok)" id="k-appr">–</div>
+        <div style="font-size:12px;color:var(--grey)">hours this week</div></div>
+      <div class="panel" style="padding:18px 20px"><div class="mini">Still clocked in</div>
+        <div style="font-family:var(--f-display);font-weight:600;font-size:30px;margin-top:2px" id="k-open">–</div>
+        <div style="font-size:12px;color:var(--grey)">open shifts</div></div>
+    </div>
+    <div id="orphans" style="display:none;background:#fdf3e2;border-left:4px solid var(--warn);
+      padding:13px 18px;border-radius:12px;font-size:13.5px;color:#7a4a00;margin-bottom:20px"></div>
+    <div id="board"><div class="panel" style="padding:26px;color:var(--grey)">Loading…</div></div>
+  </div>
+</div>
+
+<div id="modal" class="modal-back" style="display:none">
+  <div class="modal-card">
+    <button class="modal-x" onclick="document.getElementById('modal').style.display='none'">×</button>
+    <div id="m-body"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+(async function () {
+  if (!ericka.ready()) return;
+  const s = ericka.requireRole(['admin','manager','team_lead']);
+  if (!s) return;
+  if (s.role === 'admin') document.getElementById('nav-home').style.display = '';
+  // 11_admin.html is admin + manager only — a team_lead clicking it just gets
+  // bounced, so don't offer it.
+  if (s.role === 'admin' || s.role === 'manager')
+    document.getElementById('nav-admin').style.display = '';
+  if (ericka.isOperator(s)) document.getElementById('nav-mine').style.display = '';
+
+  const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const fmt = t => new Date(t).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+  const round1 = n => Math.round(n * 10) / 10;
+  // A quarter-hour of slack. Tighter than this and a 9:02 clock-in makes a
+  // clean week look like an overrun; looser and a real extra shift slips by.
+  const TOL = 0.25;
+
+  let weekMon = ericka.mondayOf(new Date());
+  let team = [], shifts = new Map(), auths = new Map();
+
+  function dateKey(d) {
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' +
+           String(d.getDate()).padStart(2,'0');
+  }
+
+  async function load() {
+    document.getElementById('wk-label').textContent = ericka.weekLabelFor(weekMon);
+    // An admin signs off anyone; a manager signs off the people pointed at her
+    // (herself included, which is how Shane approves her own seat).
+    let orphans = [];
+    if (s.role === 'admin') {
+      const { data } = await sb.from('users')
+        .select('id,name,site,vertical,rostered_hours,role,is_operator,manager_id')
+        .eq('active', true).eq('is_demo', false)
+        .or('role.eq.va,is_operator.eq.true').order('site').order('name');
+      team = data || [];
+      orphans = team.filter(t => !t.manager_id);
+    } else {
+      team = await ericka.teamForManager(s.id);
+      // A member with no approver shows on nobody's screen, so their hours
+      // never get signed off and never reach an invoice. Surface it here too,
+      // not only to the admin.
+      const { data: un } = await sb.from('users')
+        .select('id,name,site').eq('active', true).eq('is_demo', false)
+        .is('manager_id', null).or('role.eq.va,is_operator.eq.true');
+      orphans = un || [];
+    }
+    document.getElementById('orphans').innerHTML = orphans.length
+      ? '⚠️ <b>' + orphans.length + '</b> with no approver set — their hours can never be ' +
+        'signed off or invoiced: ' + esc(orphans.map(o => o.name).join(', ')) +
+        '. <a href="11_admin.html" style="color:#7a4a00"><b>Assign one →</b></a>'
+      : '';
+    document.getElementById('orphans').style.display = orphans.length ? '' : 'none';
+    const ids = team.map(t => t.id);
+    if (!ids.length) {
+      document.getElementById('board').innerHTML =
+        '<div class="panel" style="padding:26px;color:var(--grey)">Nobody is assigned to you for approval yet. ' +
+        'An admin sets this on the Admin page.</div>';
+      ['k-pend','k-appr','k-open'].forEach(id => document.getElementById(id).textContent = '0');
+      return;
+    }
+    const end = new Date(weekMon); end.setDate(end.getDate() + 7);
+    [shifts, auths] = await Promise.all([
+      ericka.shiftsInRange(ids, weekMon.toISOString(), end.toISOString()),
+      ericka.authorisationsFor(ids, dateKey(weekMon))
+    ]);
+    render();
+  }
+
+  // Everything the approve buttons need to know about one person's week.
+  function summarise(p) {
+    const list    = (shifts.get(p.id) || []);
+    const closed  = list.filter(x => x.clock_out);
+    const open    = list.filter(x => !x.clock_out);
+    const hrs     = l => l.reduce((t,x) => t + ericka.hoursBetween(x.clock_in, x.clock_out), 0);
+    const approved = closed.filter(x => x.status === 'approved');
+    const myAuths  = auths.get(p.id) || [];
+    const ceiling  = ericka.authorisedCeiling(p.rostered_hours, myAuths);
+    return {
+      list: list.slice().sort((a,b) => new Date(a.clock_in) - new Date(b.clock_in)),
+      open: open, closed: closed, auths: myAuths,
+      rostered: Number(p.rostered_hours || 0),
+      ceiling: ceiling,
+      approvedH: hrs(approved),
+      totalH: hrs(closed),
+      pendingCount: closed.filter(x => x.status !== 'approved').length
+    };
+  }
+
+  function render() {
+    let pend = 0, apprH = 0, openN = 0;
+    const html = team.map(function (p) {
+      const w = summarise(p);
+      pend += w.pendingCount; apprH += w.approvedH; openN += w.open.length;
+
+      const over = w.totalH - w.ceiling;
+      const noRoster = !w.rostered;
+      let bar = '';
+      if (noRoster) {
+        bar = '<div class="warnbar"><span>⚠️ <b>No roster set</b> — there is nothing to check these hours against. ' +
+              'Set it on the Roster page.</span>' +
+              '<a class="rowbtn" href="09_roster.html">Set roster →</a></div>';
+      } else if (over > TOL) {
+        bar = '<div class="warnbar"><span>⚠️ <b>' + round1(over) + ' h over</b> the ' +
+              round1(w.ceiling) + ' h covered this week. ' +
+              'Record Rad or Nikki’s authorisation before approving the extra.</span>' +
+              '<button class="rowbtn" data-auth="' + p.id + '">Record authorisation</button></div>';
+      } else if (w.auths.length) {
+        bar = '<div class="okbar">✅ ' + w.auths.map(a => round1(a.extra_hours) + ' h extra authorised by ' +
+              esc(a.authorised_by)).join(' · ') + '</div>';
+      }
+
+      const rows = w.list.length ? w.list.map(function (x) {
+        const isOpen = !x.clock_out;
+        const h = isOpen ? 0 : ericka.hoursBetween(x.clock_in, x.clock_out);
+        const done = x.status === 'approved';
+        // Would approving THIS shift push the week past what's covered?
+        const wouldExceed = !noRoster && !done && !isOpen &&
+                            (w.approvedH + h) > w.ceiling + TOL;
+        const tag = isOpen ? '<span class="tag open">Clocked in</span>'
+                  : done   ? '<span class="tag ok">Approved</span>'
+                           : '<span class="tag pend">Pending</span>';
+        return '<div class="srow' + (done ? ' done' : '') + '">' +
+          '<div class="day">' + new Date(x.clock_in).toLocaleDateString([], {weekday:'short', day:'numeric'}) + '</div>' +
+          '<div class="times">' + fmt(x.clock_in) + ' – ' +
+            (isOpen ? '<i style="color:var(--grey)">still on</i>' : fmt(x.clock_out)) +
+            (x.edited_at ? ' <span class="tag edit">Edited</span>' : '') +
+            (x.note ? '<div style="font-size:11.5px;color:var(--grey);margin-top:2px">' + esc(x.note) + '</div>' : '') +
+          '</div>' +
+          '<div class="hrs">' + (isOpen ? '—' : h.toFixed(2).replace(/\.?0+$/,'')) + '</div>' +
+          tag +
+          '<div style="display:flex;gap:7px;margin-left:auto">' +
+            '<button class="rowbtn" data-edit="' + x.id + '">Edit</button>' +
+            (done
+              ? '<button class="rowbtn" data-un="' + x.id + '">Undo</button>'
+              : '<button class="rowbtn go" data-ok="' + x.id + '"' +
+                (isOpen || wouldExceed ? ' disabled title="' +
+                  (isOpen ? 'Still clocked in' : 'Over the hours covered — record the authorisation first') + '"' : '') +
+                '>Approve</button>') +
+          '</div></div>';
+      }).join('') : '<div class="srow" style="color:var(--grey)">No shifts logged this week.</div>';
+
+      const canAll = !noRoster && w.pendingCount > 0 && (w.totalH <= w.ceiling + TOL) &&
+                     w.open.length === 0;
+      return '<div class="pcard">' +
+        '<div class="ph"><div class="who"><b>' + esc(p.name) + '</b><div class="s">📍 ' +
+          esc(p.site || 'Unassigned') + (p.id === s.id ? ' · your own seat' : '') + '</div></div>' +
+        '<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">' +
+          '<div style="text-align:right"><div class="mini">Approved / logged</div>' +
+            '<b style="font-size:15px">' + round1(w.approvedH) + ' / ' + round1(w.totalH) + ' h</b></div>' +
+          '<div style="text-align:right"><div class="mini">Covered</div>' +
+            '<b style="font-size:15px">' + (w.rostered ? round1(w.ceiling) + ' h' : '—') + '</b></div>' +
+          '<button class="rowbtn go" data-all="' + p.id + '"' + (canAll ? '' : ' disabled') + '>Approve week</button>' +
+        '</div></div>' + bar + rows + '</div>';
+    }).join('');
+
+    document.getElementById('board').innerHTML = html;
+    document.getElementById('k-pend').textContent = pend;
+    document.getElementById('k-appr').textContent = round1(apprH);
+    document.getElementById('k-open').textContent = openN;
+    bind();
+  }
+
+  function findShift(id) {
+    let found = null;
+    shifts.forEach(list => { const x = list.find(y => y.id === id); if (x) found = x; });
+    return found;
+  }
+
+  function bind() {
+    document.querySelectorAll('[data-ok]').forEach(b => b.onclick = async function () {
+      this.disabled = true;
+      try { await ericka.approveShift(this.dataset.ok, s.id); await load(); }
+      catch (e) { alert(e.message || e); this.disabled = false; }
+    });
+    document.querySelectorAll('[data-un]').forEach(b => b.onclick = async function () {
+      this.disabled = true;
+      try { await ericka.unapproveShift(this.dataset.un); await load(); }
+      catch (e) { alert(e.message || e); this.disabled = false; }
+    });
+    document.querySelectorAll('[data-all]').forEach(b => b.onclick = async function () {
+      const p = team.find(t => t.id === this.dataset.all);
+      const w = summarise(p);
+      this.disabled = true;
+      try {
+        for (const x of w.closed.filter(y => y.status !== 'approved')) {
+          await ericka.approveShift(x.id, s.id);
+        }
+        await load();
+      } catch (e) { alert(e.message || e); this.disabled = false; }
+    });
+    document.querySelectorAll('[data-edit]').forEach(b => b.onclick = function () {
+      openEdit(findShift(this.dataset.edit));
+    });
+    document.querySelectorAll('[data-auth]').forEach(b => b.onclick = function () {
+      openAuth(team.find(t => t.id === this.dataset.auth));
+    });
+  }
+
+  // <input type="datetime-local"> wants local wall-clock with no zone.
+  function toLocalInput(iso) {
+    const d = new Date(iso);
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' +
+      String(d.getDate()).padStart(2,'0') + 'T' + String(d.getHours()).padStart(2,'0') +
+      ':' + String(d.getMinutes()).padStart(2,'0');
+  }
+
+  function openEdit(x) {
+    if (!x) return;
+    document.getElementById('m-body').innerHTML =
+      '<div class="mini">Correct a shift</div>' +
+      '<div style="font-family:var(--f-display);font-weight:600;font-size:20px;margin:2px 0 12px">' +
+        new Date(x.clock_in).toLocaleDateString([], {weekday:'long', day:'numeric', month:'short'}) + '</div>' +
+      '<label class="mini">Clock in</label>' +
+      '<input id="e-in" type="datetime-local" value="' + toLocalInput(x.clock_in) + '" style="padding:10px 11px">' +
+      '<label class="mini" style="display:block;margin-top:12px">Clock out</label>' +
+      '<input id="e-out" type="datetime-local" value="' + (x.clock_out ? toLocalInput(x.clock_out) : '') + '" style="padding:10px 11px">' +
+      '<label class="mini" style="display:block;margin-top:12px">Why (shown on the timesheet)</label>' +
+      '<input id="e-note" value="' + esc(x.note || '') + '" placeholder="e.g. forgot to clock out, finished 5pm" style="padding:10px 11px">' +
+      '<p style="font-size:11.5px;color:var(--grey);margin-top:10px">Correcting a shift marks it <b>Edited</b> and sends it ' +
+        'back to pending, so it has to be approved again.</p>' +
+      '<div style="display:flex;align-items:center;gap:12px;margin-top:16px">' +
+        '<button id="e-save" class="btn btn-primary" style="padding:11px 24px">Save correction</button>' +
+        '<span id="e-msg" style="font-size:13px;font-weight:700"></span></div>';
+    document.getElementById('modal').style.display = 'flex';
+    document.getElementById('e-save').onclick = async function () {
+      const msg = document.getElementById('e-msg');
+      const inV = document.getElementById('e-in').value;
+      const outV = document.getElementById('e-out').value;
+      this.disabled = true;
+      try {
+        await ericka.editShift(x.id,
+          new Date(inV).toISOString(),
+          outV ? new Date(outV).toISOString() : null,
+          s.id, document.getElementById('e-note').value);
+        document.getElementById('modal').style.display = 'none';
+        await load();
+      } catch (e) {
+        msg.style.color = 'var(--danger)'; msg.textContent = e.message || String(e);
+        this.disabled = false;
+      }
+    };
+  }
+
+  function openAuth(p) {
+    const w = summarise(p);
+    const over = round1(w.totalH - w.ceiling);
+    document.getElementById('m-body').innerHTML =
+      '<div class="mini">Authorisation for extra hours</div>' +
+      '<div style="font-family:var(--f-display);font-weight:600;font-size:20px;margin:2px 0 4px">' +
+        esc(p.name) + '</div>' +
+      '<div style="font-size:13px;color:var(--grey);margin-bottom:16px">' +
+        ericka.weekLabelFor(weekMon) + ' · ' + round1(w.totalH) + ' h logged against ' +
+        round1(w.ceiling) + ' h covered</div>' +
+      (w.auths.length
+        ? '<div style="background:#e4f4ec;border-left:4px solid var(--ok);padding:10px 12px;' +
+          'border-radius:8px;font-size:12.5px;color:#1f6b45;margin-bottom:14px">Already on record for ' +
+          'this week: ' + w.auths.map(a => '<b>' + round1(a.extra_hours) + ' h</b> by ' +
+          esc(a.authorised_by)).join(', ') + '. Only add another if this is a <i>separate</i> request — ' +
+          'they add together.</div>'
+        : '') +
+      '<label class="mini">Who authorised it</label>' +
+      '<select id="a-by" style="padding:10px 11px">' +
+        '<option>Radmila Dusanovic</option><option>Nikki (SIA Medical)</option>' +
+      '</select>' +
+      '<label class="mini" style="display:block;margin-top:12px">Extra hours authorised</label>' +
+      '<input id="a-hrs" type="number" min="0.25" max="60" step="0.25" value="' + Math.max(0.25, over) + '" style="padding:10px 11px">' +
+      '<label class="mini" style="display:block;margin-top:12px">Paste their message</label>' +
+      '<textarea id="a-ev" rows="5" placeholder="Paste the message from Rad or Nikki asking for the extra hours." ' +
+        'style="width:100%;padding:10px 11px;font-family:var(--f-body);font-size:13.5px;border:1px solid var(--line);' +
+        'border-radius:var(--r-sm);resize:vertical"></textarea>' +
+      '<p style="font-size:11.5px;color:var(--grey);margin-top:8px">This is the record that the client asked for the ' +
+        'extra time. It stays attached to this week and shows on the invoice trail.</p>' +
+      '<div style="display:flex;align-items:center;gap:12px;margin-top:16px">' +
+        '<button id="a-save" class="btn btn-primary" style="padding:11px 24px">Record authorisation</button>' +
+        '<span id="a-msg" style="font-size:13px;font-weight:700"></span></div>';
+    document.getElementById('modal').style.display = 'flex';
+    document.getElementById('a-save').onclick = async function () {
+      const msg = document.getElementById('a-msg');
+      this.disabled = true;
+      try {
+        await ericka.recordAuthorisation({
+          vaId: p.id, weekStart: dateKey(weekMon),
+          extraHours: document.getElementById('a-hrs').value,
+          authorisedBy: document.getElementById('a-by').value,
+          evidence: document.getElementById('a-ev').value,
+          recordedBy: s.id
+        });
+        document.getElementById('modal').style.display = 'none';
+        await load();
+      } catch (e) {
+        msg.style.color = 'var(--danger)'; msg.textContent = e.message || String(e);
+        this.disabled = false;
+      }
+    };
+  }
+
+  document.getElementById('wk-prev').onclick = function () {
+    weekMon.setDate(weekMon.getDate() - 7); load();
+  };
+  document.getElementById('wk-next').onclick = function () {
+    weekMon.setDate(weekMon.getDate() + 7); load();
+  };
+  document.getElementById('a-sub').textContent = s.role === 'admin'
+    ? 'Every seat — sign off the week' : 'Your team’s hours, ' + s.name;
+  load();
+})();
+</script>
+</body>
+</html>

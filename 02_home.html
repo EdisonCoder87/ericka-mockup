@@ -23,8 +23,9 @@
   </div>
   <div class="nav-group-label">Main</div>
   <a href="02_home.html" class="active"><span class="ic">🏠</span> Home</a>
-  <a href="03_training.html"><span class="ic">🎓</span> Training</a>
-  <a href="04_timesheets.html"><span class="ic">🕑</span> Timesheets</a>
+  <a href="09_roster.html"><span class="ic">🗓️</span> Roster</a>
+  <a href="12_approvals.html"><span class="ic">✅</span> Approvals</a>
+  <a href="13_export.html"><span class="ic">📤</span> Pay Cycle</a>
   <div class="nav-group-label">Manage</div>
   <a href="10_team.html"><span class="ic">👥</span> Team</a>
   <a href="performance.html"><span class="ic">📊</span> Performance</a>
@@ -53,31 +54,33 @@
   </div>
 
   <div class="wrap">
-    <div class="section-h">Workspaces <span>where do you want to go?</span></div>
+    <div id="gaps" style="display:none;background:#fdf3e2;border-left:4px solid var(--warn);
+      padding:13px 18px;border-radius:12px;font-size:13.5px;color:#7a4a00;margin-bottom:22px"></div>
+    <div class="section-h">This week <span>run the remote team</span></div>
     <div class="cards c3">
 
-      <a href="03_training.html" class="ac ws dental">
-        <span class="big-ic">🦷</span>
-        <span class="ic">🎓</span>
-        <div class="t">Dental Training</div>
-        <div class="d">Onboarding, phone skills, D4W, billing &amp; HICAPS — everything a dental VA needs.</div>
-        <span class="cta">Open dental track →</span>
+      <a href="09_roster.html" class="ac ws medical">
+        <span class="big-ic">🗓️</span>
+        <span class="ic">📍</span>
+        <div class="t">Roster</div>
+        <div class="d">Who is on, Monday to Friday, by site. Weekly totals flow straight to the client portal.</div>
+        <span class="cta">Open roster →</span>
       </a>
 
-      <a href="03_training.html#medical" class="ac ws medical">
-        <span class="big-ic">🩺</span>
-        <span class="ic">🎓</span>
-        <div class="t">Medical Training</div>
-        <div class="d">GP front-desk workflows, Medicare &amp; bulk billing, practice software for medical VAs.</div>
-        <span class="cta">Open medical track →</span>
+      <a href="12_approvals.html" class="ac ws time">
+        <span class="big-ic">✅</span>
+        <span class="ic">🕑</span>
+        <div class="t">Approvals</div>
+        <div class="d">Shane and Sharica sign off their team's hours daily. Extra hours need Rad or Nikki's authorisation on the record.</div>
+        <span class="cta">Open approvals →</span>
       </a>
 
-      <a href="04_timesheets.html" class="ac ws time">
-        <span class="big-ic">🕑</span>
-        <span class="ic">📋</span>
-        <div class="t">Timesheets</div>
-        <div class="d">Clock-in records, weekly hours by VA and by client, ready for payroll and billing.</div>
-        <span class="cta">Open timesheets →</span>
+      <a href="13_export.html" class="ac ws dental">
+        <span class="big-ic">📤</span>
+        <span class="ic">📗</span>
+        <div class="t">Pay Cycle</div>
+        <div class="d">Close the period: one Xero invoice for SIA Medical, the Wise payout file, and the shift-by-shift trail.</div>
+        <span class="cta">Open pay cycle →</span>
       </a>
 
     </div>
@@ -87,19 +90,19 @@
       <a href="10_team.html" class="ac">
         <span class="ic">👥</span>
         <div class="t">Team Overview</div>
-        <div class="d">Every VA, their client, site and onboarding + training progress in one board.</div>
+        <div class="d">Every member, their client, site and onboarding + training progress in one board.</div>
         <span class="cta">View team →</span>
       </a>
-      <a href="#" class="ac">
+      <a href="performance.html" class="ac">
         <span class="ic">📊</span>
-        <div class="t">Reports</div>
-        <div class="d">Hours per client, completion rates and coaching flags for the week.</div>
-        <span class="cta">Open reports →</span>
+        <div class="t">Performance</div>
+        <div class="d">The weekly scoreboard — calls, bookings and the revenue each seat is carrying.</div>
+        <span class="cta">Open performance →</span>
       </a>
-      <a href="#" class="ac">
+      <a href="11_admin.html" class="ac">
         <span class="ic">⚙️</span>
         <div class="t">Admin &amp; Access</div>
-        <div class="d">Add VAs, set PINs, assign clients and grant training tracks.</div>
+        <div class="d">Add members, set PINs, assign clinics, rates and who approves whose hours.</div>
         <span class="cta">Open admin →</span>
       </a>
     </div>
@@ -127,6 +130,44 @@
   document.getElementById('s-vas').textContent   = st.activeVAs;
   document.getElementById('s-hrs').textContent   = st.weekHours.toFixed(0);
   document.getElementById('s-train').textContent = st.trainingPct + '%';
+
+  // Two things silently break the week: a seat with no roster (nothing to
+  // check hours against) and hours nobody has signed off (they never bill).
+  const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const names = list => esc(list.map(v => v.name).join(', '));
+  const board = await ericka.teamBoard(false);
+  const banner = document.getElementById('gaps');
+  const bits = [];
+
+  const noRoster = board.filter(v => !v.rostered);
+  if (noRoster.length) bits.push('<b>' + noRoster.length + '</b> with no roster set (' +
+    names(noRoster) + ') — <a href="09_roster.html">set it →</a>');
+
+  // Three things each silently break the invoice, so each gets called out here
+  // rather than being discovered on a Sunday: no roster to check hours against,
+  // nobody to approve them, and no rate to bill them at.
+  const { data: gaps } = await sb.from('users')
+    .select('name,manager_id,billable_rate').eq('active', true).eq('is_demo', false)
+    .or('role.eq.va,is_operator.eq.true');
+  const noApprover = (gaps || []).filter(v => !v.manager_id);
+  const noRate     = (gaps || []).filter(v => !Number(v.billable_rate));
+  if (noApprover.length) bits.push('<b>' + noApprover.length + '</b> with no approver (' +
+    names(noApprover) + ') — their hours can never be signed off — <a href="11_admin.html">assign →</a>');
+  if (noRate.length) bits.push('<b>' + noRate.length + '</b> with no billable rate (' +
+    names(noRate) + ') — they would invoice at $0 — <a href="11_admin.html">set it →</a>');
+
+  const { count } = await sb.from('timesheets')
+    .select('id', { count: 'exact', head: true })
+    .neq('status', 'approved').not('clock_out', 'is', null)
+    .gte('clock_in', ericka.weekStart().toISOString());
+  if (count) bits.push('<b>' + count + '</b> shift' + (count === 1 ? '' : 's') +
+    ' waiting on approval — <a href="12_approvals.html">review →</a>');
+
+  if (bits.length) {
+    banner.style.display = '';
+    banner.innerHTML = '⚠️ ' + bits.join('<br>⚠️ ');
+  }
 })();
 </script>
 </body>

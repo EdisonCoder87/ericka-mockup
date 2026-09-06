@@ -25,6 +25,7 @@ SUPABASE_PAT=sbp_… node run_migrations.js <file.sql>
 | 13 | `migration_13_demo_clinics.sql` | the two demo clinics Grace demos from |
 | 14 | `migration_14_period_key.sql` | keys a performance row on its week, not its label |
 | 15 | `migration_15_hide_pin_and_pay.sql` | public key can no longer read `pin` or `pay_rate` |
+| 16 | `migration_16_approvals_roster.sql` | **daily approvals · operator-managers · visual roster · extra-hours authorisation** |
 
 **⚠️ Never re-run 05 or 06** — they drop the `productivity` table.
 **⚠️ Never re-run 03 or 04 after 11/12** — they wipe *all* module content / quizzes, AI track included.
@@ -100,3 +101,78 @@ lights once that is verified — a badge a quiz alone can mint is worth nothing 
   AI badge. Same gate as everything else — it closes when RLS goes on.
 - The demo clinics live in the live database. They are hidden from managers and labelled
   "Demo" for owners — delete them once a real dental client is onboarded.
+
+---
+
+## Going live — the timesheet loop (from 7 Sep 2026)
+
+The four SIA Medical VAs clock on for real, Shane and Sharica sign the hours off,
+and the week closes into a Xero invoice. Four pages carry it:
+
+| Page | Who | What they do there |
+|---|---|---|
+| `07_va_timesheet.html` | every member | Clock in / clock out. One clock, no second system. |
+| `09_roster.html` | Shane, Sharica, Edison (Rad + Nikki read-only) | The Mon–Fri grid — who is on and when, grouped by site, with a site toggle. |
+| `12_approvals.html` | Shane, Sharica (Edison sees everyone) | Daily sign-off, correcting a forgotten clock-out, and recording the client's authorisation for extra hours. |
+| `13_export.html` | Edison, Shane, Sharica | Close the period → three CSVs. |
+
+### Who approves whom
+`users.manager_id` decides it, and it is set on the **Admin page** (the *Approved by* column).
+Seeded by migration 16:
+
+| Member | Site | Approved by |
+|---|---|---|
+| Eunice Joana Go, Lyca De Guzman | Footscray | **Shane** |
+| Kem Acibo | General VA | **Shane** |
+| Sheila Babiera, Leemay Sierra | Essendon | **Sharica** |
+| **Shane** (her own seat) | Footscray | **Shane** |
+| **Sharica** (her own seat) | Essendon | **Sharica** |
+
+Shane and Sharica keep `role = 'manager'` and gain `is_operator = true`. That flag is
+what puts them in a seat: they clock on, their hours bill, and they appear on the
+client board and the roster like anyone else — while keeping the approval power.
+They approve their own hours because `manager_id` points at themselves.
+
+### Rostered hours are DERIVED
+Save a roster on `09_roster.html` and the weekly total is written back to
+`users.rostered_hours`. There is deliberately **no** hours input on the admin page any
+more — two places to set one number is how the client card and the roster end up
+disagreeing.
+
+### Extra hours need the client's message
+Approvals blocks any shift that would push a week past `rostered_hours` + whatever
+has already been authorised. To clear it, Shane records **who** asked (Rad or Nikki),
+**how many** hours, and **pastes their actual message** into `hours_authorisations`.
+The evidence stays attached to that week. This is not advisory — the Approve button
+is disabled until the row exists.
+
+### Closing a pay cycle (Sundays)
+`13_export.html` → pick the period → check the warning bars (open shifts, unapproved
+hours, missing rates) → fill the invoice number → three downloads:
+
+1. **`xero_invoice_<period>.csv`** — Xero → *Business → Invoices → Import*.
+   Every line repeats the same `*InvoiceNumber`, so Xero builds **one** invoice to
+   SIA Medical with a line per person. Defaults: account `200`, `GST on Income`,
+   7-day terms (MSA cl 4.3). **The contact name must match the Xero contact exactly**
+   or Xero creates a duplicate contact.
+2. **`hours_<paydate>.csv`** — drop into `ericka-bpo/payroll/`, run `build_wise_batch.py`.
+   Hours only; pay rates live in `va_roster.csv` and never touch the portal.
+3. **`timesheet_detail_<period>.csv`** — every shift behind the totals, including who
+   edited what. Keep it with the invoice.
+
+**Only approved, closed shifts bill.** An open shift or an unapproved one is reported
+in the warning bars and left off the invoice — that is the point of the approval step.
+
+### Still open
+- **Everyone is signed out once** by migration 16 — the session key changed, because a
+  session stored before it carries no `is_operator` and would lock Shane and Sharica
+  out of their own timesheet page. Everyone signs back in with their PIN.
+- **`billable_rate` is 0 for the whole real team, Shane and Sharica included.** They
+  bill at $0 until it is set on the Admin page, and they show on Rad's board at $0.
+- **No lockout on PIN guessing**, and everything is still on `1234`. Each person should
+  change theirs on first login.
+- **`billable_rate` is readable** by anyone who lifts the public key from the page
+  source. `pay_rate` and `pin` are not (migration 15), so this exposes Ericka's
+  *price list*, not its margin. Closes with RLS.
+- **Writes are still app-level.** anon can write `timesheets`, so an approval is a
+  record of intent, not something the database enforces. Closes with RLS + real auth.

@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pay Cycle — Ericka Portal</title>
+<link rel="stylesheet" href="ericka.css">
+<style>
+  .mini{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grey)}
+  .ftbl{width:100%;border-collapse:collapse}
+  .ftbl th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--grey);
+    text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);font-weight:700}
+  .ftbl td{padding:11px 12px;border-bottom:1px solid var(--line);font-size:13.5px}
+  .ftbl tr:last-child td{border-bottom:none}
+  .ftbl td.n{text-align:right;font-variant-numeric:tabular-nums}
+  .ftbl tfoot td{font-weight:700;background:var(--cream);border-top:2px solid var(--line)}
+  .flagrow{color:var(--warn);font-weight:700;font-size:12px}
+  .fbox{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px}
+  .fbox > div{flex:1;min-width:130px}
+  .warnbar{background:#fdf3e2;border-left:4px solid var(--warn);padding:13px 18px;font-size:13.5px;
+    color:#7a4a00;border-radius:var(--r-md);margin-bottom:20px}
+  .dlcard{display:flex;gap:14px;align-items:flex-start;padding:18px 20px;border:1px solid var(--line);
+    border-radius:var(--r-lg);background:#fff;margin-bottom:12px}
+  .dlcard .ic{font-size:26px;line-height:1}
+  .dlcard .t{font-size:14.5px;font-weight:700}
+  .dlcard .d{font-size:12.5px;color:var(--grey);margin-top:2px;line-height:1.5}
+  .dlcard button{margin-left:auto;flex-shrink:0}
+  @media(max-width:640px){ .dlcard{flex-wrap:wrap} .dlcard button{margin-left:0;width:100%} }
+</style>
+</head>
+<body>
+
+<input type="checkbox" id="navtog">
+<div class="app-topbar">
+  <label class="burger" for="navtog"><span></span><span></span><span></span></label>
+  <div class="wm rev">Erick<span class="a">a</span></div>
+</div>
+
+<nav class="app-sidebar">
+  <div class="sidebar-brand">
+    <div class="wm rev">Erick<span class="a">a</span></div>
+    <svg class="pulse" viewBox="0 0 90 14" preserveAspectRatio="none"><path d="M2 7 H32 l4 -5 l5 10 l4 -8 l3 3 H88"/></svg>
+  </div>
+  <div class="nav-group-label">Manage</div>
+  <a id="nav-home" href="02_home.html" style="display:none"><span class="ic">🏠</span> Home</a>
+  <a href="10_team.html"><span class="ic">👥</span> Team</a>
+  <a href="09_roster.html"><span class="ic">🗓️</span> Roster</a>
+  <a href="12_approvals.html"><span class="ic">✅</span> Approvals</a>
+  <a id="nav-mine" href="07_va_timesheet.html" style="display:none"><span class="ic">🕑</span> My Timesheet</a>
+  <a href="13_export.html" class="active"><span class="ic">📤</span> Pay Cycle</a>
+  <a href="performance.html"><span class="ic">📊</span> Performance</a>
+  <a id="nav-admin" href="11_admin.html" style="display:none"><span class="ic">⚙️</span> Admin</a>
+  <a href="01_welcome.html" class="logout" onclick="ericka.logout();return false;"><span class="ic">↩</span> Sign out</a>
+</nav>
+
+<div class="page">
+  <div class="phead">
+    <div class="phead-inner">
+      <div>
+        <h1>Pay Cycle</h1>
+        <div class="sub">Close the period, bill the client, pay the team</div>
+      </div>
+      <span class="chip chip-medical" id="e-badge" style="padding:9px 18px;font-size:13px">—</span>
+    </div>
+  </div>
+
+  <div class="wrap">
+
+    <div class="panel" style="padding:22px 24px;margin-bottom:24px">
+      <div class="mini" style="margin-bottom:12px">Period</div>
+      <div class="fbox">
+        <div><label class="mini">Bill to</label><select id="f-client" style="padding:10px 11px"></select></div>
+        <div><label class="mini">From</label><input id="f-from" type="date" style="padding:10px 11px"></div>
+        <div><label class="mini">To (inclusive)</label><input id="f-to" type="date" style="padding:10px 11px"></div>
+        <div style="flex:0 0 auto"><button class="btn btn-primary" id="f-go" style="padding:11px 24px">Load period</button></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+        <button class="btn btn-ghost" data-quick="thisweek" style="padding:7px 14px;font-size:12.5px">This week</button>
+        <button class="btn btn-ghost" data-quick="lastweek" style="padding:7px 14px;font-size:12.5px">Last week</button>
+        <button class="btn btn-ghost" data-quick="thismonth" style="padding:7px 14px;font-size:12.5px">This month</button>
+        <button class="btn btn-ghost" data-quick="lastmonth" style="padding:7px 14px;font-size:12.5px">Last month</button>
+      </div>
+    </div>
+
+    <div id="flags"></div>
+
+    <div class="section-h">Hours in this period <span>approved hours are the billable ones</span></div>
+    <div class="panel" style="padding:0;overflow-x:auto;margin-bottom:28px">
+      <table class="ftbl" id="tbl"><tbody><tr><td style="padding:24px;color:var(--grey)">Pick a period and load it.</td></tr></tbody></table>
+    </div>
+
+    <div class="section-h">Invoice details <span>what goes on the Xero import</span></div>
+    <div class="panel" style="padding:22px 24px;margin-bottom:28px">
+      <div class="fbox">
+        <div><label class="mini">Bill to (Xero contact)</label><input id="x-contact" value="SIA Medical" style="padding:10px 11px"></div>
+        <div><label class="mini">Invoice number</label><input id="x-no" placeholder="ERICKA-02" style="padding:10px 11px"></div>
+      </div>
+      <div class="fbox">
+        <div><label class="mini">Invoice date</label><input id="x-date" type="date" style="padding:10px 11px"></div>
+        <div><label class="mini">Due date</label><input id="x-due" type="date" style="padding:10px 11px"></div>
+        <div><label class="mini">Account code</label><input id="x-acct" value="200" style="padding:10px 11px"></div>
+        <div><label class="mini">Tax type</label>
+          <select id="x-tax" style="padding:10px 11px">
+            <option>GST on Income</option><option>BAS Excluded</option><option>GST Free Income</option>
+          </select></div>
+      </div>
+      <p style="font-size:12px;color:var(--grey);margin-top:4px">
+        Terms are <b>7 days</b> per the MSA (cl 4.3) — the due date fills in automatically.
+        One invoice, one line per team member, matching invoice&nbsp;#01 to Newwin Consulting.
+      </p>
+    </div>
+
+    <div class="section-h">Downloads <span>three files, three jobs</span></div>
+
+    <div class="dlcard">
+      <span class="ic">📗</span>
+      <div><div class="t">Xero sales invoice (CSV)</div>
+        <div class="d">Import at <b>Business → Invoices → Import</b>. Every line carries the same invoice
+          number, so Xero builds <b>one</b> invoice to SIA Medical with a line per person.
+          Check the contact name matches Xero exactly or it will create a new one.</div></div>
+      <button class="btn btn-primary" id="dl-xero" style="padding:11px 22px" disabled>Download</button>
+    </div>
+
+    <div class="dlcard">
+      <span class="ic">💸</span>
+      <div><div class="t">Contractor payout (CSV)</div>
+        <div class="d">Save as <code>hours_&lt;paydate&gt;.csv</code> in <code>ericka-bpo/payroll/</code>
+          and run <code>build_wise_batch.py</code>. Covers <b>everyone</b> for the period,
+          not just the client selected above — we pay the whole team in one run.
+          Hours only; the pay rate lives in <code>va_roster.csv</code>, never in the portal.</div></div>
+      <button class="btn btn-ghost" id="dl-pay" style="padding:11px 22px" disabled>Download</button>
+    </div>
+
+    <div class="dlcard">
+      <span class="ic">🧾</span>
+      <div><div class="t">Shift-by-shift detail (CSV)</div>
+        <div class="d">Every clock record behind the totals, with who edited what. Keep it with the
+          invoice — this is what answers a query about a line six weeks later.</div></div>
+      <button class="btn btn-ghost" id="dl-detail" style="padding:11px 22px" disabled>Download</button>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+(async function () {
+  if (!ericka.ready()) return;
+  const s = ericka.requireRole(['admin','manager','team_lead']);
+  if (!s) return;
+  if (s.role === 'admin') document.getElementById('nav-home').style.display = '';
+  if (s.role === 'admin' || s.role === 'manager')
+    document.getElementById('nav-admin').style.display = '';
+  if (ericka.isOperator(s)) document.getElementById('nav-mine').style.display = '';
+
+  const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const money = n => '$' + Number(n || 0).toLocaleString('en-AU', {minimumFractionDigits:2, maximumFractionDigits:2});
+  const key = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' +
+                   String(d.getDate()).padStart(2,'0');
+
+  // rows      = the people on the selected client — these build the invoice.
+  // payRows    = every active member — these get PAID, whoever they bill to.
+  // Kem is the reason these differ: she sits on Newwin Consulting, not SIA Medical.
+  let rows = [], payRows = [], detail = new Map(), period = { from: null, to: null };
+  let datesTouched = false;
+  let clientId = ericka.SIA_MEDICAL_CLIENT_ID, clientName = 'SIA Medical';
+
+  // Default = the week just gone. Edison closes the cycle on a Sunday, so on
+  // Sunday the week that matters is the one ending TODAY, not last Monday's.
+  (function setDefault() {
+    const mon = ericka.mondayOf(new Date());
+    const sun = new Date(mon); sun.setDate(sun.getDate() + 6);
+    document.getElementById('f-from').value = key(mon);
+    document.getElementById('f-to').value   = key(sun);
+  })();
+
+  function quick(which) {
+    const now = new Date();
+    let from, to;
+    if (which === 'thisweek') {
+      from = ericka.mondayOf(now); to = new Date(from); to.setDate(to.getDate() + 6);
+    } else if (which === 'lastweek') {
+      from = ericka.mondayOf(now); from.setDate(from.getDate() - 7);
+      to = new Date(from); to.setDate(to.getDate() + 6);
+    } else if (which === 'thismonth') {
+      from = new Date(now.getFullYear(), now.getMonth(), 1);
+      to   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    } else {
+      from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      to   = new Date(now.getFullYear(), now.getMonth(), 0);
+    }
+    document.getElementById('f-from').value = key(from);
+    document.getElementById('f-to').value   = key(to);
+    load();
+  }
+
+  function periodLabel() {
+    const f = new Date(period.from + 'T00:00:00'), t = new Date(period.to + 'T00:00:00');
+    const o = { day:'numeric', month:'short' };
+    return f.toLocaleDateString('en-AU', o) + ' – ' + t.toLocaleDateString('en-AU', {day:'numeric', month:'short', year:'numeric'});
+  }
+
+  async function loadClients() {
+    const { data } = await sb.from('clients').select('id,name').order('name');
+    const real = (data || []).filter(c => !/^Demo /.test(c.name));
+    const sel = document.getElementById('f-client');
+    sel.innerHTML = real.map(c => '<option value="' + c.id + '"' +
+      (c.id === clientId ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('') +
+      '<option value="">General VAs (no client)</option>';
+    sel.onchange = function () {
+      clientId = this.value || null;
+      clientName = this.options[this.selectedIndex].text;
+      const c = document.getElementById('x-contact');
+      if (clientId) c.value = clientName;
+      load();
+    };
+  }
+
+  async function load() {
+    period.from = document.getElementById('f-from').value;
+    period.to   = document.getElementById('f-to').value;
+    if (!period.from || !period.to || period.from > period.to) {
+      alert('Check the dates — "from" has to be on or before "to".'); return;
+    }
+    document.getElementById('e-badge').textContent = periodLabel();
+    // One invoice per client; one payout run for the whole team.
+    const all = await ericka.payCycle(null, period.from, period.to);
+    payRows = all;
+    rows = clientId ? all.filter(r => r.client_id === clientId)
+                    : all.filter(r => !r.client_id);
+
+    const endEx = new Date(period.to + 'T00:00:00'); endEx.setDate(endEx.getDate() + 1);
+    detail = await ericka.shiftsInRange(all.map(r => r.id),
+      new Date(period.from + 'T00:00:00').toISOString(), endEx.toISOString());
+
+    // Invoice + due dates follow the period unless the user has typed their own.
+    // They used to stick to the FIRST period loaded, so changing the period
+    // changed every line on the CSV but not its dates.
+    if (!datesTouched) {
+      const iss = new Date(period.to + 'T00:00:00');
+      const due = new Date(iss); due.setDate(due.getDate() + 7);   // MSA cl 4.3
+      document.getElementById('x-date').value = key(iss);
+      document.getElementById('x-due').value  = key(due);
+    }
+    render();
+  }
+
+  function render() {
+    const billable = rows.filter(r => r.approvedHours > 0);
+    const totalH   = rows.reduce((t,r) => t + r.approvedHours, 0);
+    const totalAmt = rows.reduce((t,r) => t + r.amount, 0);
+    const gst      = totalAmt * 0.1;
+
+    // Anything that would make the invoice wrong, before it is sent.
+    const pending = rows.filter(r => r.pendingHours > 0);
+    const open    = rows.filter(r => r.openShifts > 0);
+    const norate  = rows.filter(r => r.approvedHours > 0 && !r.rate);
+    let flags = '';
+    if (open.length) flags += '<div class="warnbar">🔴 <b>' + open.length + '</b> still clocked in (' +
+      esc(open.map(r => r.name).join(', ')) + '). An open shift bills nothing — close it first.</div>';
+    if (pending.length) flags += '<div class="warnbar">⚠️ <b>' +
+      pending.reduce((t,r) => t + r.pendingHours, 0).toFixed(2).replace(/\.?0+$/,'') +
+      ' h</b> logged but not approved (' + esc(pending.map(r => r.name).join(', ')) +
+      '). Unapproved hours are left off the invoice. <a href="12_approvals.html" style="color:#7a4a00"><b>Approve them →</b></a></div>';
+    if (norate.length) flags += '<div class="warnbar">⚠️ No billable rate set for <b>' +
+      esc(norate.map(r => r.name).join(', ')) + '</b> — they would invoice at $0. Set it on the Admin page.</div>';
+    document.getElementById('flags').innerHTML = flags;
+
+    document.getElementById('tbl').innerHTML =
+      '<thead><tr><th>Team member</th><th>Site</th><th style="text-align:right">Approved h</th>' +
+      '<th style="text-align:right">Pending h</th><th style="text-align:right">Rate</th>' +
+      '<th style="text-align:right">Amount</th></tr></thead><tbody>' +
+      (rows.length ? rows.map(r =>
+        '<tr><td><b>' + esc(r.name) + '</b></td><td>' + esc(r.site) + '</td>' +
+        '<td class="n">' + r.approvedHours.toFixed(2) + '</td>' +
+        '<td class="n' + (r.pendingHours ? ' flagrow' : '') + '">' +
+          (r.pendingHours ? r.pendingHours.toFixed(2) : '—') + '</td>' +
+        '<td class="n">' + (r.rate ? money(r.rate) : '<span class="flagrow">not set</span>') + '</td>' +
+        '<td class="n">' + money(r.amount) + '</td></tr>').join('')
+        : '<tr><td colspan="6" style="padding:24px;color:var(--grey)">No team members found for this period.</td></tr>') +
+      '</tbody><tfoot>' +
+      '<tr><td colspan="2">Subtotal (ex GST)</td><td class="n">' + totalH.toFixed(2) + '</td>' +
+        '<td></td><td></td><td class="n">' + money(totalAmt) + '</td></tr>' +
+      '<tr><td colspan="5">GST (10%)</td><td class="n">' + money(gst) + '</td></tr>' +
+      '<tr><td colspan="5">Total due (AUD)</td><td class="n" style="color:var(--gold-text)">' +
+        money(totalAmt + gst) + '</td></tr>' +
+      '</tfoot>';
+
+    const on = billable.length > 0;
+    document.getElementById('dl-xero').disabled   = !on;
+    document.getElementById('dl-detail').disabled = !on;
+    document.getElementById('dl-pay').disabled    = !payRows.some(r => r.approvedHours > 0);
+  }
+
+  function stamp() { return period.from + '_to_' + period.to; }
+
+  document.getElementById('dl-xero').onclick = function () {
+    const no = document.getElementById('x-no').value.trim();
+    if (!no) { alert('Give the invoice a number first (e.g. ERICKA-02).'); return; }
+    ericka.downloadCsv('xero_invoice_' + stamp() + '.csv',
+      ericka.xeroInvoiceCsv(rows, {
+        contactName: document.getElementById('x-contact').value.trim(),
+        invoiceNumber: no,
+        reference: 'VA services ' + periodLabel(),
+        invoiceDate: document.getElementById('x-date').value,
+        dueDate: document.getElementById('x-due').value,
+        accountCode: document.getElementById('x-acct').value.trim(),
+        taxType: document.getElementById('x-tax').value,
+        periodLabel: periodLabel()
+      }));
+  };
+  document.getElementById('dl-pay').onclick = function () {
+    ericka.downloadCsv('hours_' + period.to + '.csv', ericka.payoutCsv(payRows));
+  };
+  document.getElementById('dl-detail').onclick = function () {
+    ericka.downloadCsv('timesheet_detail_' + stamp() + '.csv', ericka.detailCsv(payRows, detail));
+  };
+
+  ['x-date','x-due'].forEach(id =>
+    document.getElementById(id).addEventListener('input', () => { datesTouched = true; }));
+  await loadClients();
+  document.getElementById('f-go').onclick = load;
+  document.querySelectorAll('[data-quick]').forEach(b => b.onclick = function () { quick(this.dataset.quick); });
+  load();
+})();
+</script>
+</body>
+</html>

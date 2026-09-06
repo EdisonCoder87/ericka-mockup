@@ -42,6 +42,10 @@
   <div class="nav-group-label">Manage</div>
   <a id="nav-home" href="02_home.html"><span class="ic">🏠</span> Home</a>
   <a href="10_team.html" class="active"><span class="ic">👥</span> Team</a>
+  <a href="09_roster.html"><span class="ic">🗓️</span> Roster</a>
+  <a id="nav-appr" href="12_approvals.html" style="display:none"><span class="ic">✅</span> Approvals</a>
+  <a id="nav-mine" href="07_va_timesheet.html" style="display:none"><span class="ic">🕑</span> My Timesheet</a>
+  <a id="nav-exp" href="13_export.html" style="display:none"><span class="ic">📤</span> Pay Cycle</a>
   <a href="performance.html"><span class="ic">📊</span> Performance</a>
   <a id="nav-admin" href="11_admin.html" style="display:none"><span class="ic">⚙️</span> Admin</a>
   <a href="01_welcome.html" class="logout" onclick="ericka.logout();return false;"><span class="ic">↩</span> Sign out</a>
@@ -65,6 +69,7 @@
   </div>
 
   <div class="wrap">
+    <div id="clock-bar" style="margin-bottom:16px"></div>
     <div id="rates-bar" style="margin-bottom:18px"></div>
     <div id="board"><div class="panel" style="padding:26px;color:var(--grey)">Loading the team…</div></div>
   </div>
@@ -89,6 +94,41 @@
   const isOwner = s.role === 'admin';
   if (isOwner || s.role === 'manager')
     document.getElementById('nav-admin').style.display = '';
+  if (ericka.canApprove(s)) {
+    document.getElementById('nav-appr').style.display = '';
+    document.getElementById('nav-exp').style.display = '';
+  }
+  // Shane and Sharica work a seat as well as running one — their own clock
+  // lives in the same place every other member's does.
+  if (ericka.isOperator(s)) {
+    document.getElementById('nav-mine').style.display = '';
+    (async function clockBar() {
+      const bar = document.getElementById('clock-bar');
+      async function draw() {
+        const open = await ericka.openShift(s.id);
+        const hrs = ericka.sumHoursLive(await ericka.weekShifts(s.id));
+        bar.innerHTML = '<div class="panel" style="padding:14px 20px;display:flex;align-items:center;' +
+          'gap:14px;flex-wrap:wrap;border-left:4px solid ' + (open ? 'var(--ok)' : 'var(--line)') + '">' +
+          '<div style="font-size:14px;font-weight:700">' +
+            (open ? '🟢 You are clocked in since ' +
+                new Date(open.clock_in).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'})
+                  : '⚪ You are not clocked in') + '</div>' +
+          '<div style="font-size:12.5px;color:var(--grey)">' + hrs.toFixed(1) + ' h logged this week</div>' +
+          '<button id="cb-btn" class="btn ' + (open ? 'btn-ghost' : 'btn-primary') +
+            '" style="padding:10px 22px;margin-left:auto">' +
+            (open ? '■ Clock out' : '▶ Clock in') + '</button></div>';
+        document.getElementById('cb-btn').onclick = async function () {
+          this.disabled = true;
+          try {
+            if (open) await ericka.clockOut(open.id);
+            else await ericka.clockIn(s.id, s.client_id);
+          } catch (e) { alert(e.message || e); }
+          draw();
+        };
+      }
+      draw();
+    })();
+  }
 
   const initials = n => n.replace(/\s*\(.*\)$/, '').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
   const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));

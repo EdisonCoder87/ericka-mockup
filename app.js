@@ -5,7 +5,11 @@
    by the session's client_id. pay_rate is never selected by a client query.
    ============================================================================ */
 (function () {
-  const SESSION_KEY = "ericka_session";
+  // Bumped with migration 16: a session stored before it carries no
+  // is_operator, so Shane and Sharica would be locked out of their own
+  // timesheet page until they signed out. Changing the key signs everyone out
+  // once, which is the cheap version of refreshing the session.
+  const SESSION_KEY = "ericka_session_v2";
 
   /* ---- session ---------------------------------------------------------- */
   function session() {
@@ -41,6 +45,15 @@
     if (!u) return false;
     if (u.site === GENERAL_VA) return true;
     return u.role === "va" && !u.client_id;
+  }
+
+  // A manager who also works a client seat (Shane at Footscray, Sharica at
+  // Essendon). She keeps her manager powers AND clocks on like anyone else.
+  function isOperator(u) { return !!(u && u.is_operator); }
+  // Who may sign off timesheets. Operators still approve — holding a seat does
+  // not take the approval away, it only adds their own row to the list.
+  function canApprove(u) {
+    return !!u && (u.role === "manager" || u.role === "team_lead" || u.role === "admin");
   }
 
   // Guard a page. Pass allowed roles, e.g. requireRole(['va']).
@@ -123,7 +136,13 @@
     if (error) throw error;
     return data;
   }
+  // Two entry points can clock you in (the timesheet page and an operator's
+  // team-page bar), and a stale tab is enough to hit both. A second open shift
+  // never gets closed — it inflates the client board forever and blocks
+  // "Approve week". So reuse the open one rather than inserting another.
   async function clockIn(vaId, clientId) {
+    const existing = await openShift(vaId);
+    if (existing) return existing;
     const { data, error } = await sb.from("timesheets")
       .insert({ va_id: vaId, client_id: clientId }).select().single();
     if (error) throw error;
@@ -623,8 +642,10 @@
   async function clientBoard(clientId, periodStart) {
     const { data: vas, error: e1 } = await sb.from("users")
       // note: pay_rate NOT selected. rostered_hours is not pay data.
-      .select("id,name,vertical,billable_rate,site,rostered_hours")
-      .eq("client_id", clientId).eq("role", "va").eq("active", true)
+      .select("id,name,vertical,billable_rate,site,rostered_hours,role,is_operator")
+      .eq("client_id", clientId).eq("active", true)
+      // a VA, or a manager who holds a seat here — both bill, both show
+      .or("role.eq.va,is_operator.eq.true")
       .order("site").order("name");
     if (e1) throw e1;
     if (!vas || !vas.length) return [];
@@ -751,8 +772,8 @@
   // team do not, so demo people can't be mistaken for staff to follow up.
   async function teamBoard(includeDemo) {
     let q = sb.from("users")
-      .select("id,name,vertical,site,client_id,rostered_hours,is_demo")
-      .eq("role", "va").eq("active", true);
+      .select("id,name,vertical,site,client_id,rostered_hours,is_demo,role,is_operator")
+      .eq("active", true).or("role.eq.va,is_operator.eq.true");
     if (!includeDemo) q = q.eq("is_demo", false);
     const { data: vas, error } = await q.order("name");
     if (error) throw error;
@@ -782,6 +803,7 @@
           client: clientName[va.client_id] || "—",
           client_id: va.client_id,
           is_demo: !!va.is_demo,
+          role: va.role, is_operator: !!va.is_operator,
           rostered: Number(va.rostered_hours || 0),
           hours: hours,
           pace: paceFor(hours, va.rostered_hours),
@@ -793,10 +815,323 @@
     return out;
   }
 
+  /* ---- roster (the visual Mon–Fri roster) -------------------------------- */
+  const DAY_NAMES = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+
+  // "09:00" / "09:00:00" -> 9.0. Anything unparseable is 0, never NaN — a bad
+  // time must not poison a whole week's rostered total.
+  function timeToHours(t) {
+    if (!t) return 0;
+    const p = String(t).split(":");
+    const h = Number(p[0]), m = Number(p[1] || 0);
+    if (isNaN(h) || isNaN(m)) return 0;
+    return h + m / 60;
+  }
+  function shiftLength(s) {
+    return Math.max(0, timeToHours(s.end_time) - timeToHours(s.start_time));
+  }
+  // 9.5 -> "9:30am". The roster card label.
+  function fmtTime(t) {
+    const h24 = Math.floor(timeToHours(t));
+    const m = Math.round((timeToHours(t) - h24) * 60);
+    const ap = h24 >= 12 ? "pm" : "am";
+    const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+    return h12 + (m ? ":" + String(m).padStart(2, "0") : "") + ap;
+  }
+
+  // Roster shifts for a set of members, as Map(va_id -> shifts[]) sorted by
+  // day then start. One query, not one per person.
+  async function rosterForMany(vaIds) {
+    const out = new Map();
+    (vaIds || []).forEach(id => out.set(id, []));
+    if (!vaIds || !vaIds.length) return out;
+    const { data, error } = await sb.from("roster_shifts")
+      .select("*").in("va_id", vaIds)
+      .order("weekday").order("start_time");
+    if (error) throw error;
+    (data || []).forEach(r => { if (out.has(r.va_id)) out.get(r.va_id).push(r); });
+    return out;
+  }
+
+  // Replace one member's whole roster, then push the weekly total back onto
+  // users.rostered_hours. The total is DERIVED — nobody types it twice, so the
+  // client card and the roster grid can never disagree.
+  async function saveRoster(vaId, shifts) {
+    const list = shifts || [];
+    // Reject, never silently drop. A dropped 22:00–06:00 shift used to vanish
+    // with a success message and no explanation.
+    for (const sh of list) {
+      if (sh.weekday == null || sh.weekday < 0 || sh.weekday > 6) {
+        throw new Error("That shift has no valid day.");
+      }
+      if (!sh.start_time || !sh.end_time) throw new Error("A shift needs a start and a finish.");
+      if (timeToHours(sh.end_time) <= timeToHours(sh.start_time)) {
+        throw new Error("Finish has to be later than start (overnight shifts aren't supported).");
+      }
+    }
+    // Two shifts on one day must not overlap — that is how a day silently
+    // becomes 16 hours and lifts the approvals ceiling with it.
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const a = list[i], b = list[j];
+        if (a.weekday !== b.weekday) continue;
+        if (timeToHours(a.start_time) < timeToHours(b.end_time) &&
+            timeToHours(b.start_time) < timeToHours(a.end_time)) {
+          throw new Error("Two shifts on " + DAY_NAMES[a.weekday] + " overlap.");
+        }
+      }
+    }
+    // Delete + insert + the rostered_hours write happen together inside the
+    // database (migration 16), so a failure can't leave a half-saved roster.
+    const { data, error } = await sb.rpc("save_roster", {
+      p_va_id: vaId,
+      p_shifts: list.map(sh => ({
+        weekday: sh.weekday, start_time: sh.start_time, end_time: sh.end_time
+      }))
+    });
+    if (error) throw new Error(error.message || "Could not save that roster.");
+    return Number(data || 0);
+  }
+
+  // Rostered hours per weekday for one member — 0=Mon … 6=Sun. Lets the client
+  // coverage strip show actual against planned instead of actual alone.
+  function rosterByDay(shifts) {
+    const out = [0,0,0,0,0,0,0];
+    (shifts || []).forEach(s => { out[s.weekday] += shiftLength(s); });
+    return out;
+  }
+
+  /* ---- approvals -------------------------------------------------------- */
+  // Everyone whose timesheets this manager signs off. A manager who also works
+  // a seat points at herself, so she comes back in her own list.
+  async function teamForManager(managerId) {
+    const { data, error } = await sb.from("users")
+      .select("id,name,site,vertical,client_id,rostered_hours,is_operator,role")
+      .eq("manager_id", managerId).eq("active", true)
+      .order("name");
+    if (error) throw error;
+    return data || [];
+  }
+
+  // Shifts for a set of members over an arbitrary date range (approvals screen
+  // and the pay-cycle export both need this; weekShiftsForMany is week-only).
+  async function shiftsInRange(vaIds, startIso, endIso) {
+    const out = new Map();
+    (vaIds || []).forEach(id => out.set(id, []));
+    if (!vaIds || !vaIds.length) return out;
+    const { data, error } = await sb.from("timesheets")
+      .select("*").in("va_id", vaIds)
+      .gte("clock_in", startIso).lt("clock_in", endIso)
+      .order("clock_in");
+    if (error) throw error;
+    (data || []).forEach(r => { if (out.has(r.va_id)) out.get(r.va_id).push(r); });
+    return out;
+  }
+
+  // Approve / un-approve one shift. An OPEN shift can never be approved —
+  // there is no finish time to approve, and billing runs off closed shifts.
+  async function approveShift(shiftId, managerId) {
+    const { data: row, error: e0 } = await sb.from("timesheets")
+      .select("clock_out").eq("id", shiftId).maybeSingle();
+    if (e0) throw e0;
+    if (!row) throw new Error("That shift no longer exists.");
+    if (!row.clock_out) throw new Error("Still clocked in — close the shift before approving it.");
+    const { error } = await sb.from("timesheets")
+      .update({ status: "approved", approved_by: managerId, approved_at: new Date().toISOString() })
+      .eq("id", shiftId);
+    if (error) throw error;
+  }
+  async function unapproveShift(shiftId) {
+    const { error } = await sb.from("timesheets")
+      .update({ status: "pending", approved_by: null, approved_at: null }).eq("id", shiftId);
+    if (error) throw error;
+  }
+
+  // Correct a shift's times — the forgotten clock-out. Stamps who changed it
+  // and when, and drops the shift back to pending: an edited shift has to be
+  // approved again, so a correction can never slip through already signed off.
+  async function editShift(shiftId, clockInIso, clockOutIso, editorId, note) {
+    if (!clockInIso) throw new Error("A shift needs a start time.");
+    if (clockOutIso && new Date(clockOutIso) <= new Date(clockInIso)) {
+      throw new Error("Clock out has to be after clock in.");
+    }
+    if (clockOutIso && hoursBetween(clockInIso, clockOutIso) > 16) {
+      throw new Error("That shift is over 16 hours — check the date on the times.");
+    }
+    const { error } = await sb.from("timesheets").update({
+      clock_in: clockInIso,
+      clock_out: clockOutIso || null,
+      note: note || null,
+      edited_by: editorId,
+      edited_at: new Date().toISOString(),
+      status: "pending", approved_by: null, approved_at: null
+    }).eq("id", shiftId);
+    if (error) throw error;
+  }
+
+  /* ---- authorisation for hours above the roster ------------------------- */
+  // Extra hours are the CLIENT's call, not the manager's. Shane can't approve a
+  // week that runs over roster until Rad's or Nikki's message is on the record.
+  async function authorisationsFor(vaIds, weekStartDate) {
+    const out = new Map();
+    (vaIds || []).forEach(id => out.set(id, []));
+    if (!vaIds || !vaIds.length) return out;
+    const { data, error } = await sb.from("hours_authorisations")
+      .select("*").in("va_id", vaIds).eq("week_start", weekStartDate)
+      .order("created_at");
+    if (error) throw error;
+    (data || []).forEach(r => { if (out.has(r.va_id)) out.get(r.va_id).push(r); });
+    return out;
+  }
+  async function recordAuthorisation(a) {
+    const evidence = (a.evidence || "").trim();
+    const by = (a.authorisedBy || "").trim();
+    const extra = Number(a.extraHours);
+    if (!by) throw new Error("Say who authorised it (Rad or Nikki).");
+    if (evidence.length < 15) throw new Error("Paste the actual message — a few words isn't evidence.");
+    if (!(extra > 0)) throw new Error("Extra hours must be more than zero.");
+    const { error } = await sb.from("hours_authorisations").insert({
+      va_id: a.vaId, week_start: a.weekStart, extra_hours: extra,
+      authorised_by: by, evidence: evidence, recorded_by: a.recordedBy || null
+    });
+    if (error) throw error;
+  }
+  // Hours this week that are covered: the roster, plus anything the client has
+  // authorised on top of it.
+  function authorisedCeiling(rostered, auths) {
+    return Number(rostered || 0)
+      + (auths || []).reduce((t, a) => t + Number(a.extra_hours || 0), 0);
+  }
+
+  /* ---- pay-cycle export -------------------------------------------------- */
+  // One row per member for a date range: approved hours (what we bill and pay),
+  // pending hours (what is still waiting on a manager) and the money.
+  // Deliberately splits the two — billing an unapproved hour is the whole thing
+  // the approval step exists to prevent.
+  async function payCycle(clientId, startDate, endDate) {
+    let q = sb.from("users")
+      .select("id,name,site,billable_rate,rostered_hours,role,is_operator,client_id")
+      .eq("active", true).eq("is_demo", false)
+      .or("role.eq.va,is_operator.eq.true");
+    if (clientId) q = q.eq("client_id", clientId);
+    const { data: people, error } = await q.order("site").order("name");
+    if (error) throw error;
+    if (!people || !people.length) return [];
+
+    const startIso = new Date(startDate + "T00:00:00").toISOString();
+    const endIso   = new Date(endDate   + "T00:00:00");
+    endIso.setDate(endIso.getDate() + 1);              // end date is inclusive
+    const shiftsAll = await shiftsInRange(people.map(p => p.id), startIso, endIso.toISOString());
+
+    return people.map(function (p) {
+      const shifts   = shiftsAll.get(p.id) || [];
+      const closed   = shifts.filter(s => s.clock_out);
+      const approved = closed.filter(s => s.status === "approved");
+      const pending  = closed.filter(s => s.status !== "approved");
+      const open     = shifts.filter(s => !s.clock_out);
+      const hrs      = list => list.reduce((t, s) => t + hoursBetween(s.clock_in, s.clock_out), 0);
+      const approvedH = Math.round(hrs(approved) * 100) / 100;
+      const rate      = Number(p.billable_rate || 0);
+      return {
+        id: p.id, name: p.name, site: p.site || "Unassigned",
+        client_id: p.client_id,
+        rate: rate,
+        approvedHours: approvedH,
+        pendingHours: Math.round(hrs(pending) * 100) / 100,
+        openShifts: open.length,
+        shiftCount: approved.length,
+        amount: Math.round(approvedH * rate * 100) / 100
+      };
+    });
+  }
+
+  // CSV escaping: quote anything with a comma, quote or newline, and double up
+  // inner quotes. A VA note pasted with a comma must not shift every column.
+  function csvCell(v) {
+    const s = v === null || v === undefined ? "" : String(v);
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+  function toCsv(rows) {
+    return rows.map(r => r.map(csvCell).join(",")).join("\r\n") + "\r\n";
+  }
+
+  // Xero "Sales Invoices" import. Every line repeats ContactName and
+  // InvoiceNumber — that is how Xero groups lines onto ONE invoice, which is
+  // what we want: SIA Medical gets a single invoice with a line per person.
+  const XERO_HEADER = [
+    "*ContactName","EmailAddress","POAddressLine1","POAddressLine2","POAddressLine3",
+    "POAddressLine4","POCity","PORegion","POPostalCode","POCountry","*InvoiceNumber",
+    "Reference","*InvoiceDate","*DueDate","InventoryItemCode","*Description","*Quantity",
+    "*UnitAmount","Discount","*AccountCode","*TaxType","TrackingName1","TrackingOption1",
+    "TrackingName2","TrackingOption2","Currency","BrandingTheme"
+  ];
+  // dd/mm/yyyy — Xero AU's import date format.
+  function auDate(d) {
+    const x = d instanceof Date ? d : new Date(d + "T00:00:00");
+    return String(x.getDate()).padStart(2,"0") + "/" +
+           String(x.getMonth()+1).padStart(2,"0") + "/" + x.getFullYear();
+  }
+  function xeroInvoiceCsv(rows, opt) {
+    const o = opt || {};
+    const billable = rows.filter(r => r.approvedHours > 0);
+    const out = [XERO_HEADER];
+    billable.forEach(function (r) {
+      out.push([
+        o.contactName || "SIA Medical", o.email || "", "", "", "", "", "", "", "", "",
+        o.invoiceNumber || "", o.reference || "",
+        auDate(o.invoiceDate), auDate(o.dueDate),
+        "",
+        r.name + " — " + r.site + " — VA services " + o.periodLabel +
+          " (" + r.approvedHours.toFixed(2) + " h @ $" + r.rate.toFixed(2) + "/h)",
+        r.approvedHours.toFixed(2), r.rate.toFixed(2), "",
+        o.accountCode || "200", o.taxType || "GST on Income",
+        "", "", "", "", o.currency || "AUD", ""
+      ]);
+    });
+    return toCsv(out);
+  }
+  // The contractor payout side — matches hours_<paydate>.csv in ericka-bpo/payroll,
+  // which build_wise_batch.py reads.
+  function payoutCsv(rows) {
+    const out = [["va_name","hours","adjustment","note"]];
+    rows.filter(r => r.approvedHours > 0)
+        .forEach(r => out.push([r.name, r.approvedHours.toFixed(2), "0", ""]));
+    return toCsv(out);
+  }
+  // A full audit line per shift, so a disputed invoice can be walked back to
+  // the individual clock records that built it.
+  function detailCsv(rows, shiftsByVa) {
+    const out = [["va_name","site","date","clock_in","clock_out","hours","status","edited","note"]];
+    rows.forEach(function (r) {
+      (shiftsByVa.get(r.id) || []).filter(s => s.clock_out).forEach(function (s) {
+        const d = new Date(s.clock_in);
+        out.push([
+          r.name, r.site, auDate(d),
+          new Date(s.clock_in).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}),
+          new Date(s.clock_out).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}),
+          hoursBetween(s.clock_in, s.clock_out).toFixed(2),
+          s.status || "pending", s.edited_at ? "yes" : "", s.note || ""
+        ]);
+      });
+    });
+    return toCsv(out);
+  }
+  // Hand the browser a file. Not an <a download> on a data: URI — a blob URL
+  // is what survives Safari on his phone.
+  function downloadCsv(filename, text) {
+    const blob = new Blob(["﻿" + text], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   /* ---- admin aggregate (all VAs) ---------------------------------------- */
   async function adminStats() {
     const { data: vas } = await sb.from("users")
-      .select("id,vertical").eq("role", "va").eq("active", true)
+      .select("id,vertical").eq("active", true)
+      .or("role.eq.va,is_operator.eq.true")
       .eq("is_demo", false);        // demo clinics never inflate the real stats
     let totalHours = 0, totalDone = 0, totalMods = 0;
     const modsCache = {};
@@ -824,8 +1159,8 @@
   // pay_rate — managers must not see pay economics. Newest first.
   async function listMembers(includeDemo) {
     let q = sb.from("users")
-      .select("id,name,role,site,vertical,active,created_at,rostered_hours,is_demo")
-      .eq("role", "va");
+      .select("id,name,role,site,vertical,active,created_at,rostered_hours,is_demo,is_operator,manager_id")
+      .or("role.eq.va,is_operator.eq.true");
     if (!includeDemo) q = q.eq("is_demo", false);   // demo clinics are owner-only
     const { data, error } = await q
       .order("active", { ascending: false })
@@ -867,6 +1202,11 @@
       if (isNaN(h) || h < 0 || h > 80) throw new Error("Rostered hours must be between 0 and 80.");
       patch.rostered_hours = h;
     }
+    // Who signs off this person's timesheets. null = nobody yet — the admin
+    // home banner and the admin view of Approvals both call that out, because
+    // an unassigned member's hours would otherwise never reach an invoice.
+    if ("manager_id" in fields) patch.manager_id = fields.manager_id || null;
+    if ("is_operator" in fields) patch.is_operator = !!fields.is_operator;
     const { error } = await sb.from("users").update(patch).eq("id", userId);
     if (error) throw error;
   }
@@ -898,6 +1238,11 @@
     METRIC_SETS, metricSet, RATE_KEYS, RATE_DEFAULTS,
     perfRates, savePerfRates, perfDerived, buildScoreboard,
     answerRate, bookedTotal, trend, trendChip,
+    DAY_NAMES, timeToHours, shiftLength, fmtTime, rosterForMany, saveRoster, rosterByDay,
+    teamForManager, shiftsInRange, approveShift, unapproveShift, editShift,
+    authorisationsFor, recordAuthorisation, authorisedCeiling,
+    payCycle, xeroInvoiceCsv, payoutCsv, detailCsv, downloadCsv, toCsv, auDate,
+    isOperator, canApprove,
     // small helper: bail out gracefully if keys aren't set yet
     ready() {
       if (!window.ERICKA_CONFIGURED) {
