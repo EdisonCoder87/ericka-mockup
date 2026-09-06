@@ -135,11 +135,20 @@ grant select (id, name, role, client_id, vertical, site, billable_rate,
               is_operator, manager_id)
   on users to anon;
 
+-- ⚠️ Supabase's default privileges hand anon FULL rights on every table created
+--    in `public`, so a bare `grant select` here changes nothing — the new tables
+--    arrive with INSERT/UPDATE/DELETE already attached. Revoke first, then grant
+--    back only what the browser actually performs.
+revoke all on roster_shifts        from anon;
+revoke all on hours_authorisations from anon;
+
 -- The roster is written ONLY through save_roster() below, so anon needs no
 -- write grant at all here — and in particular no DELETE, which migration 08
 -- deliberately took away from the public key.
-grant select on roster_shifts        to anon;
-grant select, insert on hours_authorisations to anon;   -- never rewritten
+grant select on roster_shifts to anon;
+-- An authorisation is evidence: it can be written once and read, never edited
+-- or removed, or the record of what the client asked for stops being a record.
+grant select, insert on hours_authorisations to anon;
 
 -- 9. Saving a roster has to be one transaction -------------------------------
 --    The browser used to delete every shift and then insert the new set. A

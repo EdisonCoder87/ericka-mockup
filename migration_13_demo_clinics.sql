@@ -169,7 +169,10 @@ select p.va::uuid, u.client_id,
        p.otp_due, p.otp_contacted, p.otp_booked, p.new_patients,
        'Demo data'
   from p join wk on true join users u on u.id = p.va::uuid
-on conflict (user_id, period_label) do nothing;
+-- Keyed on period_start, not period_label — migration 14 moved the unique
+-- constraint there (a re-typed label used to create a duplicate week). This
+-- clause still named the old key, so the demo refresh has been failing since.
+on conflict (user_id, period_start) do nothing;
 
 -- 7. Training progress --------------------------------------------------------
 --    Everyone finishes onboarding; training and the AI track vary so the
