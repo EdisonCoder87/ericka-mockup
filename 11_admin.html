@@ -152,7 +152,7 @@
       .select('id,name').in('role', ['manager','team_lead','admin'])
       .eq('active', true).eq('is_demo', false).order('name');
     approvers = mg || [];
-    members = await ericka.listMembers(isAdmin);
+    members = await ericka.listMembers(false);   // demo accounts stay out of the real roster
     document.getElementById('s-count').textContent =
       members.filter(m => m.active).length;
     const tb = document.getElementById('mrows');

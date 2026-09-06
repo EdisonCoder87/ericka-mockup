@@ -133,7 +133,16 @@
   const TOL = 0.25;
 
   let weekMon = ericka.mondayOf(new Date());
-  let team = [], shifts = new Map(), auths = new Map();
+  let team = [], shifts = new Map(), auths = new Map(), contacts = [];
+
+  // The people who can authorise extra hours are whoever holds a client login —
+  // read from the table rather than hard-coded, so it survives Nikki or Rad
+  // being renamed, replaced or joined by a third.
+  function clientContactOpts() {
+    return contacts.length
+      ? contacts.map(c => '<option>' + esc(c.name) + '</option>').join('')
+      : '<option>Client</option>';
+  }
 
   function dateKey(d) {
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' +
@@ -142,6 +151,12 @@
 
   async function load() {
     document.getElementById('wk-label').textContent = ericka.weekLabelFor(weekMon);
+    if (!contacts.length) {
+      const { data: cc } = await sb.from('users')
+        .select('name').eq('role', 'client_admin').eq('active', true)
+        .eq('is_demo', false).order('name');
+      contacts = cc || [];
+    }
     // An admin signs off anyone; a manager signs off the people pointed at her
     // (herself included, which is how Shane approves her own seat).
     let orphans = [];
@@ -377,9 +392,7 @@
           'they add together.</div>'
         : '') +
       '<label class="mini">Who authorised it</label>' +
-      '<select id="a-by" style="padding:10px 11px">' +
-        '<option>Radmila Dusanovic</option><option>Nikki (SIA Medical)</option>' +
-      '</select>' +
+      '<select id="a-by" style="padding:10px 11px">' + clientContactOpts() + '</select>' +
       '<label class="mini" style="display:block;margin-top:12px">Extra hours authorised</label>' +
       '<input id="a-hrs" type="number" min="0.25" max="60" step="0.25" value="' + Math.max(0.25, over) + '" style="padding:10px 11px">' +
       '<label class="mini" style="display:block;margin-top:12px">Paste their message</label>' +

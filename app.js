@@ -72,6 +72,9 @@
     const { data, error } = await sb.rpc("check_login", {
       p_name: name, p_pin: String(pin)
     });
+    // check_login only returns ACTIVE users. The demo accounts are deactivated
+    // (migration 17) and re-created active by migration 13, which Grace runs
+    // before a demo anyway — so the demo path needs no special login.
     if (error) throw error;
     const user = Array.isArray(data) ? data[0] : data;
     if (!user) return null;

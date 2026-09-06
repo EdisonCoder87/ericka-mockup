@@ -116,7 +116,7 @@ insert into users (id, name, pin, role, client_id, vertical, billable_rate, pay_
   -- Ericka admin (you) — sees everything
   ('a0000000-0000-0000-0000-000000000001','Edison Nguyen','1988','admin', null, null, 0, 0),
   -- SIA Medical client admin — view-only, scoped to SIA Medical
-  ('c0000000-0000-0000-0000-000000000001','Nikki (SIA Medical)','2024','client_admin','11111111-1111-1111-1111-111111111111','medical',0,0),
+  ('c0000000-0000-0000-0000-000000000001','Nikki','2024','client_admin','11111111-1111-1111-1111-111111111111','medical',0,0),
   -- SIA Medical VAs
   ('b0000000-0000-0000-0000-000000000001','Bea Villanueva','1111','va','11111111-1111-1111-1111-111111111111','medical',35,12),
   ('b0000000-0000-0000-0000-000000000002','Joy Tolentino','2222','va','11111111-1111-1111-1111-111111111111','medical',35,12),

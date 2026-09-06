@@ -132,8 +132,10 @@
 
   const initials = n => n.replace(/\s*\(.*\)$/, '').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
   const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  // Owners see the seeded demo clinics; managers running the real team do not.
-  const board = await ericka.teamBoard(isOwner);
+  // Nobody sees the seeded demo clinics on the team board any more — the tool
+  // is in real use, so a made-up name beside Eunice's is just noise. Grace still
+  // demos by signing in as a demo owner (01_welcome.html?demo=1).
+  const board = await ericka.teamBoard(false);
 
   // Revenue-rate editor — the values used to auto-calc revenue from bookings.
   const rates = await ericka.perfRates();

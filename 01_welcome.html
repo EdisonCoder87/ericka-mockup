@@ -47,16 +47,23 @@
   const existing = ericka.session();
   if (existing) { location.href = ericka.homeFor(existing.role); return; }
 
-  // populate the name dropdown from the users table
+  // Populate the name dropdown. Names only — everyone here knows what they do,
+  // and printing "· VA" beside a person's name on the screen they sign in to
+  // every morning reads as a label on them, not a helpful hint.
+  //
+  // The seeded demo accounts are deactivated (migration 17) so they stay out of
+  // the team's list. ?demo=1 brings them back for Grace to present from.
+  const showDemo = new URLSearchParams(location.search).get('demo') === '1';
   const sel = document.getElementById('name');
-  const { data: users, error } = await sb.from('users')
-    .select('name,role').eq('active', true).order('role').order('name');
+  let q = sb.from('users').select('name,is_demo').order('name');
+  if (!showDemo) q = q.eq('active', true).eq('is_demo', false);
+  const { data: users, error } = await q;
   if (!error && users) {
-    const labelRole = { admin: 'Admin', manager: 'Ericka Manager', team_lead: 'Team Lead', client_admin: 'Client', va: 'VA' };
     users.forEach(function (u) {
       const o = document.createElement('option');
       o.value = u.name;
-      o.textContent = u.name + '  ·  ' + (labelRole[u.role] || u.role);
+      // Only in demo mode is the distinction worth drawing, and then it matters.
+      o.textContent = showDemo && u.is_demo ? u.name + '  ·  demo' : u.name;
       sel.appendChild(o);
     });
   }

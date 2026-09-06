@@ -26,6 +26,7 @@ SUPABASE_PAT=sbp_… node run_migrations.js <file.sql>
 | 14 | `migration_14_period_key.sql` | keys a performance row on its week, not its label |
 | 15 | `migration_15_hide_pin_and_pay.sql` | public key can no longer read `pin` or `pay_rate` |
 | 16 | `migration_16_approvals_roster.sql` | **daily approvals · operator-managers · visual roster · extra-hours authorisation** |
+| 17 | `migration_17_clean_names.sql` | real names only (drops "(SIA Medical)" etc.) · demo accounts deactivated |
 
 **⚠️ Never re-run 05 or 06** — they drop the `productivity` table.
 **⚠️ Never re-run 03 or 04 after 11/12** — they wipe *all* module content / quizzes, AI track included.
@@ -48,7 +49,7 @@ dropdown, type 1234. Each person changes theirs on first login — client and VA
 |---|---|
 | Owner (`admin`) | Edison Nguyen · Grace Sia |
 | Ericka Manager (`manager`) | Shane · Sharica |
-| Client (`client_admin`, view only) | Nikki (SIA Medical) · Radmila Dusanovic |
+| Client (`client_admin`, view only) | Nikki · Radmila Dusanovic |
 | Remote member (`va`) | the real team |
 | **Demo owner — dental** | Demo Owner (Dental) |
 | **Demo owner — medical** | Demo Owner (Medical) |
@@ -176,3 +177,29 @@ in the warning bars and left off the invoice — that is the point of the approv
   *price list*, not its margin. Closes with RLS.
 - **Writes are still app-level.** anon can write `timesheets`, so an approval is a
   record of intent, not something the database enforces. Closes with RLS + real auth.
+
+---
+
+## Demo accounts (Grace)
+
+The seeded demo clinics are **deactivated** (migration 17) so they stay out of the
+team's login list, the team board, the admin roster and every count. They are not
+deleted — their timesheets and training rows are what make a demo look real, and
+removing the user would cascade those away.
+
+To present:
+
+```
+SUPABASE_PAT=sbp_… node run_migrations.js migration_13_demo_clinics.sql
+```
+
+That re-creates them **active** and re-anchors their timesheets to the current week
+(which is what makes them go stale after Sunday). They still don't appear on the
+normal login screen — open **`portal.ericka.com.au/01_welcome.html?demo=1`** to see
+and sign in as `Demo Owner (Dental)` or `Demo Owner (Medical)`, PIN `1234`.
+
+Afterwards, re-run migration 17 to put them away again:
+
+```
+SUPABASE_PAT=sbp_… node run_migrations.js migration_17_clean_names.sql
+```
