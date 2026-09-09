@@ -57,15 +57,21 @@
 <script>
 (async function () {
   if (!ericka.ready()) return;
-  const s = ericka.requireRole(['va','admin','team_lead','client_admin']);
+  const s = ericka.requireRole(['va','admin','team_lead','client_admin','manager']);
   if (!s) return;
 
-  const id = new URLSearchParams(location.search).get('id');
+  const params = new URLSearchParams(location.search);
+  const id = params.get('id');
   if (!id) { location.href = ericka.homeFor(s.role); return; }
 
-  // send managers back to their own home, VAs back to training
+  // Review mode: a manager/admin walking the content to critique it. They see
+  // the real quiz, but nothing they do is saved (no progress, no evidence).
+  const review = params.get('review') === '1';
+
+  // send reviewers back to the review page, managers to their home, VAs to training
   document.getElementById('back').href =
-    (s.role === 'va') ? '06_va_training.html' : ericka.homeFor(s.role);
+    review ? '14_review_training.html'
+           : (s.role === 'va') ? '06_va_training.html' : ericka.homeFor(s.role);
 
   const mod = await ericka.moduleWithSections(id);
   if (!mod) { document.getElementById('mtitle').textContent = 'Module not found'; return; }
@@ -94,9 +100,19 @@
   const PASS = 75;             // percent needed to pass
   const backHome = isAI ? '06_va_training.html' : (isOnb ? '05_va_home.html' : '06_va_training.html');
 
-  if (s.role !== 'va') {
+  // Non-VA opening a module NOT in review mode (e.g. from the team board) —
+  // read-only, no quiz. In review mode we deliberately fall through so the
+  // reviewer gets the full trainee experience (quiz included).
+  if (s.role !== 'va' && !review) {
     cta.innerHTML = '<p style="color:var(--grey);font-size:13px">Manager view — read only.</p>';
     return;
+  }
+
+  if (review) {
+    document.getElementById('cta').insertAdjacentHTML('beforebegin',
+      '<div class="quiz-result fail" style="background:var(--mist);color:var(--violet-d)">'
+      + '👀 Review mode — this is exactly what a trainee sees. Take the quiz to test it; '
+      + 'nothing you do here is saved. Log your feedback in the review doc.</div>');
   }
 
   // A module that needs a practical isn't finished when the quiz passes — the
@@ -140,6 +156,10 @@
 
   // No quiz for this module → simple mark-complete
   if (!quiz.length) {
+    if (review) {
+      cta.innerHTML = '<p style="color:var(--grey);font-size:13px">No quiz on this module — a trainee taps “Mark complete” here to continue.</p>';
+      return;
+    }
     const btn = document.createElement('button');
     btn.className = 'btn btn-primary';
     btn.style.padding = '15px 40px';
@@ -202,6 +222,12 @@
     }
     const pct = Math.round(correct / quiz.length * 100);
     if (pct >= PASS) {
+      if (review) {
+        result.className = 'quiz-result pass';
+        result.textContent = 'Passed — ' + pct + '% (' + correct + '/' + quiz.length + '). (Review mode — a trainee would complete the module here; nothing saved.)';
+        document.getElementById('q-submit').disabled = true;
+        return;
+      }
       result.className = 'quiz-result pass';
       result.textContent = 'Passed — ' + pct + '% (' + correct + '/' + quiz.length + '). Saving…';
       const btn = document.getElementById('q-submit');
