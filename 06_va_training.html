@@ -107,6 +107,45 @@
     (allMods.length ? Math.round(doneCount/allMods.length*100) : 0) + '%';
   document.getElementById('prog-text').textContent = doneCount + ' of ' + allMods.length + ' complete';
 
+  // ── Certification banners (mirrors the SIA training tool) ──────────────────
+  function latestDate(mods) {
+    let t = 0;
+    mods.forEach(function (m) { const r = rows.get(m.id); if (r && r.completed_at) t = Math.max(t, new Date(r.completed_at).getTime()); });
+    return t ? new Date(t).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' }) : '';
+  }
+  const clinical = onb.concat(trn);
+  const clinicalDone = clinical.filter(m => done.has(m.id));
+  const fullyCertified = clinical.length > 0 && clinicalDone.length === clinical.length;
+  const aiEarned = ai.length > 0 && ericka.AI_TIERS.every(function (t) {
+    const set = ai.filter(m => m.tier === t.tier);
+    const evi = set.filter(m => m.requires_evidence);
+    return set.length > 0 && set.every(m => done.has(m.id)) && evi.every(m => { const r = rows.get(m.id); return r && r.verified_at; });
+  });
+  const banners = [];
+  if (fullyCertified) {
+    const d = latestDate(clinicalDone);
+    banners.push('<div style="background:linear-gradient(135deg,#dcfce7,#f0fdf4);border:2px solid #16a34a;border-radius:18px;padding:26px;text-align:center;box-shadow:0 0 30px rgba(22,163,74,.2);margin-bottom:18px">'
+      + '<div style="font-size:42px;line-height:1">🏆</div>'
+      + '<div style="font-family:var(--f-display);font-weight:700;font-size:23px;color:#166534;margin-top:8px;letter-spacing:.02em">FULLY CERTIFIED</div>'
+      + '<div style="font-size:14.5px;color:#15803d;margin-top:5px">All ' + clinical.length + ' onboarding + training modules complete' + (d ? ' · ' + d : '') + ' — great work.</div></div>');
+  }
+  if (aiEarned) {
+    const d = latestDate(ai.filter(m => done.has(m.id)));
+    banners.push('<div style="background:linear-gradient(135deg,#ede9fe,#f5f3ff);border:2px solid var(--violet);border-radius:18px;padding:26px;text-align:center;box-shadow:0 0 30px rgba(124,58,237,.18);margin-bottom:18px">'
+      + '<div style="font-size:42px;line-height:1">🤖</div>'
+      + '<div style="font-family:var(--f-display);font-weight:700;font-size:23px;color:var(--violet-d);margin-top:8px;letter-spacing:.02em">AI CERTIFIED</div>'
+      + '<div style="font-size:14.5px;color:var(--violet);margin-top:5px">AI Assisted + AI Builder badges earned' + (d ? ' · ' + d : '') + ' — verified by your manager.</div></div>');
+  }
+  if (banners.length) document.querySelector('.wrap').insertAdjacentHTML('afterbegin', banners.join(''));
+
+  // Turn the progress panel green once fully certified (matches the SIA tool).
+  if (fullyCertified) {
+    const panel = document.querySelector('.wrap .panel');
+    if (panel) { panel.style.borderColor = '#16a34a'; panel.style.background = '#16a34a08'; }
+    document.querySelector('.pbar.gold span').style.background = '#16a34a';
+    document.getElementById('track-title').innerHTML = '🏆 Certified' + (latestDate(clinicalDone) ? ' · ' + latestDate(clinicalDone) : '');
+  }
+
   // Render a track. Modules open the viewer; next-uncompleted is highlighted,
   // later ones are locked until the one before is done (sequential).
   function renderTrack(containerId, mods) {

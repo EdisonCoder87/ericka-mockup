@@ -138,6 +138,47 @@
     document.getElementById('next-mod-d').textContent = "Nice work — you've finished your onboarding and training.";
   }
 
+  // ── Certification banners + hero pill (mirrors the SIA training tool) ──────
+  const rows = await ericka.progressRowsFor(s.id);
+  const onb = mods.filter(m => m.category === 'onboarding');
+  const trn = mods.filter(m => m.category === 'training');
+  const ai  = mods.filter(m => m.category === 'ai');
+  function latestDate(list) {
+    let t = 0;
+    list.forEach(function (m) { const r = rows.get(m.id); if (r && r.completed_at) t = Math.max(t, new Date(r.completed_at).getTime()); });
+    return t ? new Date(t).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' }) : '';
+  }
+  const clinical = onb.concat(trn);
+  const clinicalDone = clinical.filter(m => done.indexOf(m.id) !== -1);
+  const fullyCertified = clinical.length > 0 && clinicalDone.length === clinical.length;
+  const aiEarned = ai.length > 0 && ericka.AI_TIERS.every(function (t) {
+    const set = ai.filter(m => m.tier === t.tier);
+    const evi = set.filter(m => m.requires_evidence);
+    return set.length > 0 && set.every(m => done.indexOf(m.id) !== -1) && evi.every(m => { const r = rows.get(m.id); return r && r.verified_at; });
+  });
+  if (fullyCertified) {
+    const d = latestDate(clinicalDone);
+    document.querySelector('.hero-left > div').insertAdjacentHTML('beforeend',
+      '<span class="badge-pill" style="border-color:#4ade80;color:#fff;background:rgba(22,163,74,.32)">'
+      + '<span class="dot" style="background:#4ade80"></span> 🏆 Certified' + (d ? ' · ' + d : '') + '</span>');
+  }
+  const banners = [];
+  if (fullyCertified) {
+    const d = latestDate(clinicalDone);
+    banners.push('<div style="background:linear-gradient(135deg,#dcfce7,#f0fdf4);border:2px solid #16a34a;border-radius:18px;padding:26px;text-align:center;box-shadow:0 0 30px rgba(22,163,74,.2);margin-bottom:4px">'
+      + '<div style="font-size:42px;line-height:1">🏆</div>'
+      + '<div style="font-family:var(--f-display);font-weight:700;font-size:23px;color:#166534;margin-top:8px;letter-spacing:.02em">FULLY CERTIFIED</div>'
+      + '<div style="font-size:14.5px;color:#15803d;margin-top:5px">All ' + clinical.length + ' onboarding + training modules complete' + (d ? ' · ' + d : '') + ' — great work.</div></div>');
+  }
+  if (aiEarned) {
+    const d = latestDate(ai.filter(m => done.indexOf(m.id) !== -1));
+    banners.push('<div style="background:linear-gradient(135deg,#ede9fe,#f5f3ff);border:2px solid var(--violet);border-radius:18px;padding:26px;text-align:center;box-shadow:0 0 30px rgba(124,58,237,.18);margin-bottom:4px">'
+      + '<div style="font-size:42px;line-height:1">🤖</div>'
+      + '<div style="font-family:var(--f-display);font-weight:700;font-size:23px;color:var(--violet-d);margin-top:8px;letter-spacing:.02em">AI CERTIFIED</div>'
+      + '<div style="font-size:14.5px;color:var(--violet);margin-top:5px">AI Assisted + AI Builder badges earned' + (d ? ' · ' + d : '') + ' — verified by your manager.</div></div>');
+  }
+  if (banners.length) document.querySelector('.wrap').insertAdjacentHTML('afterbegin', banners.join(''));
+
   // hours this week — shown against the roster, the same way the client sees it
   const shifts = await ericka.weekShifts(s.id);
   const liveHrs = ericka.sumHoursLive(shifts);
