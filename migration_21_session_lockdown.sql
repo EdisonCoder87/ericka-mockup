@@ -58,7 +58,7 @@ $$;
 revoke all on function _session_user(uuid) from public, anon, authenticated;
 
 create or replace function _require_role(u users, roles text[])
-returns void language plpgsql immutable as $$
+returns void language plpgsql immutable set search_path = public as $$
 begin
   if not (u.role = any(roles)) then
     raise exception 'Not allowed for your role.';
