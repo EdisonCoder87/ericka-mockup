@@ -20,6 +20,9 @@
   <div class="wm" style="font-size:26px;margin-bottom:4px">Erick<span class="a">a</span></div>
   <h1 style="font-family:var(--f-display);font-weight:600;font-size:24px;color:var(--ink);margin:14px 0 4px">My account</h1>
   <p style="color:var(--grey);font-size:13px;margin-bottom:22px">Signed in as <b id="who">…</b>. Change your PIN below — keep it private.</p>
+  <div id="must-change" class="panel" style="display:none;padding:14px 18px;margin-bottom:14px;border-left:4px solid var(--warn, #d97706);font-size:14px;line-height:1.5">
+    <b>Please set your own PIN to continue.</b> You're still on the starter PIN (1234), which everyone knows.
+  </div>
 
   <div class="panel" style="padding:22px">
     <div class="fld"><label for="p1">New PIN</label>
@@ -43,6 +46,10 @@
   if (!s) return;
   document.getElementById('back').href = ericka.homeFor(s.role);
   document.getElementById('who').textContent = s.name;
+  if (s.must_change_pin) {
+    const n = document.getElementById('must-change');
+    n.style.display = 'block';
+  }
 
   const msg = document.getElementById('msg');
   document.getElementById('save').addEventListener('click', async function () {
@@ -54,6 +61,7 @@
     try {
       await ericka.changeMyPin(s.id, p1);
       msg.className = 'msg-ok'; msg.textContent = 'PIN changed ✓';
+      if (s.must_change_pin) { setTimeout(() => { location.href = ericka.homeFor(s.role); }, 800); }
       document.getElementById('p1').value = ''; document.getElementById('p2').value = '';
     } catch (e) { msg.textContent = 'Could not save: ' + (e.message || e); }
   });

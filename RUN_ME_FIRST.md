@@ -27,6 +27,11 @@ SUPABASE_PAT=sbp_… node run_migrations.js <file.sql>
 | 15 | `migration_15_hide_pin_and_pay.sql` | public key can no longer read `pin` or `pay_rate` |
 | 16 | `migration_16_approvals_roster.sql` | **daily approvals · operator-managers · visual roster · extra-hours authorisation** |
 | 17 | `migration_17_clean_names.sql` | real names only (drops "(SIA Medical)" etc.) · demo accounts deactivated |
+| 21 | `migration_21_session_lockdown.sql` | **security: every write needs a signed-in session token + role check · PIN lockout · RLS on · 1234 must be changed** |
+
+**🔒 Since 21, the browser can't write to any table directly.** A new write = a new
+`security definer` function that starts with `_session_user(p_token)`, and a new table must
+`revoke all ... from anon, authenticated` + enable RLS. Supabase Auth sign-up is switched OFF.
 
 **⚠️ Never re-run 05 or 06** — they drop the `productivity` table.
 **⚠️ Never re-run 03 or 04 after 11/12** — they wipe *all* module content / quizzes, AI track included.

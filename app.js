@@ -9,7 +9,9 @@
   // is_operator, so Shane and Sharica would be locked out of their own
   // timesheet page until they signed out. Changing the key signs everyone out
   // once, which is the cheap version of refreshing the session.
-  const SESSION_KEY = "ericka_session_v2";
+  // Bumped again with migration 21: sessions now carry a database token that
+  // every write must present, so a v2 session (no token) signs in once more.
+  const SESSION_KEY = "ericka_session_v3";
 
   /* ---- session ---------------------------------------------------------- */
   function session() {
@@ -17,7 +19,29 @@
     catch (e) { return null; }
   }
   function setSession(u) { localStorage.setItem(SESSION_KEY, JSON.stringify(u)); }
-  function logout() { localStorage.removeItem(SESSION_KEY); location.href = "01_welcome.html"; }
+  function logout() {
+    const s = session();
+    localStorage.removeItem(SESSION_KEY);
+    const go = () => { location.href = "01_welcome.html"; };
+    if (s && s.token && window.sb) sb.rpc("logout_session", { p_token: s.token }).then(go, go);
+    else go();
+  }
+
+  // Every write goes through a database function that checks the caller's
+  // session token and role (migration 21) — anon has no direct write rights.
+  // An expired or revoked session sends the person back to sign in.
+  async function call(fn, args) {
+    const s = session();
+    const { data, error } = await sb.rpc(fn, Object.assign({ p_token: s && s.token }, args));
+    if (error) {
+      if (/SESSION_EXPIRED/.test(error.message || "")) {
+        localStorage.removeItem(SESSION_KEY);
+        location.href = "01_welcome.html";
+      }
+      throw error;
+    }
+    return data;
+  }
 
   // Home page for each role
   function homeFor(role) {
@@ -60,6 +84,10 @@
   function requireRole(roles) {
     const s = session();
     if (!s) { location.href = "01_welcome.html"; return null; }
+    // Still on the handover PIN: change it before anything else.
+    if (s.must_change_pin && !/account\.html$/.test(location.pathname)) {
+      location.href = "account.html"; return null;
+    }
     if (roles && roles.indexOf(s.role) === -1) { location.href = homeFor(s.role); return null; }
     return s;
   }
@@ -146,17 +174,11 @@
   async function clockIn(vaId, clientId) {
     const existing = await openShift(vaId);
     if (existing) return existing;
-    const { data, error } = await sb.from("timesheets")
-      .insert({ va_id: vaId, client_id: clientId }).select().single();
-    if (error) throw error;
-    return data;
+    // vaId is always the signed-in person — the database uses the session's.
+    return await call("clock_in", { p_client_id: clientId });
   }
   async function clockOut(shiftId) {
-    const { data, error } = await sb.from("timesheets")
-      .update({ clock_out: new Date().toISOString() }).eq("id", shiftId)
-      .select().single();
-    if (error) throw error;
-    return data;
+    return await call("clock_out", { p_shift_id: shiftId });
   }
   // All shifts for a VA this week (most recent first).
   async function weekShifts(vaId) {
@@ -305,26 +327,17 @@
   async function submitEvidence(userId, moduleId, url) {
     const link = String(url || "").trim();
     if (!isSafeUrl(link)) throw new Error("Paste a plain link starting with http:// or https://");
-    const { error } = await sb.from("training_progress")
-      .update({ evidence_url: link, verified_by: null, verified_at: null })
-      .eq("user_id", userId).eq("module_id", moduleId);
-    if (error) throw error;
+    await call("submit_evidence", { p_module_id: moduleId, p_url: link });
   }
   // A manager verifies (or un-verifies) that practical.
   async function verifyEvidence(userId, moduleId, managerId, ok) {
-    const { error } = await sb.from("training_progress")
-      .update(ok
-        ? { verified_by: managerId, verified_at: new Date().toISOString() }
-        : { verified_by: null, verified_at: null })
-      .eq("user_id", userId).eq("module_id", moduleId);
-    if (error) throw error;
+    await call("verify_evidence", { p_user_id: userId, p_module_id: moduleId, p_ok: !!ok });
   }
   async function completeModule(userId, moduleId, score) {
-    const row = { user_id: userId, module_id: moduleId };
-    if (typeof score === "number") row.score = score;
-    const { error } = await sb.from("training_progress").insert(row);
-    // ignore duplicate-key (already complete — first pass sticks)
-    if (error && error.code !== "23505") throw error;
+    // Already complete is fine — the database keeps the first pass.
+    await call("complete_module", {
+      p_module_id: moduleId, p_score: typeof score === "number" ? score : null
+    });
   }
   // Quiz questions for a module (empty array = no quiz, use mark-complete).
   async function quizFor(moduleId) {
@@ -400,9 +413,7 @@
     PROD_FIELDS.forEach(f => { row[f] = p[f] || 0; });
     // Conflict on the week, not its label: a label is display text and can be
     // re-typed, which would otherwise create a second row for the same week.
-    const { error } = await sb.from("productivity")
-      .upsert(row, { onConflict: "user_id,period_start" });
-    if (error) throw error;
+    await call("save_productivity", { p_row: row });
   }
 
   /* ---- metric sets (one per vertical) ------------------------------------
@@ -493,10 +504,9 @@
     return Object.assign({}, RATE_DEFAULTS);
   }
   async function savePerfRates(vals) {
-    const row = { id: 1, updated_at: new Date().toISOString() };
+    const row = {};
     RATE_KEYS.forEach(k => { if (vals[k] != null) row[k] = vals[k]; });
-    const { error } = await sb.from("perf_rates").upsert(row, { onConflict: "id" });
-    if (error) throw error;
+    await call("save_perf_rates", { p_vals: row });
   }
 
   // Revenue for one productivity row, broken down by the groups that earn it.
@@ -886,13 +896,15 @@
     }
     // Delete + insert + the rostered_hours write happen together inside the
     // database (migration 16), so a failure can't leave a half-saved roster.
-    const { data, error } = await sb.rpc("save_roster", {
-      p_va_id: vaId,
-      p_shifts: list.map(sh => ({
-        weekday: sh.weekday, start_time: sh.start_time, end_time: sh.end_time
-      }))
-    });
-    if (error) throw new Error(error.message || "Could not save that roster.");
+    let data;
+    try {
+      data = await call("save_roster_s", {
+        p_va_id: vaId,
+        p_shifts: list.map(sh => ({
+          weekday: sh.weekday, start_time: sh.start_time, end_time: sh.end_time
+        }))
+      });
+    } catch (e) { throw new Error(e.message || "Could not save that roster."); }
     return Number(data || 0);
   }
 
@@ -934,20 +946,11 @@
   // Approve / un-approve one shift. An OPEN shift can never be approved —
   // there is no finish time to approve, and billing runs off closed shifts.
   async function approveShift(shiftId, managerId) {
-    const { data: row, error: e0 } = await sb.from("timesheets")
-      .select("clock_out").eq("id", shiftId).maybeSingle();
-    if (e0) throw e0;
-    if (!row) throw new Error("That shift no longer exists.");
-    if (!row.clock_out) throw new Error("Still clocked in — close the shift before approving it.");
-    const { error } = await sb.from("timesheets")
-      .update({ status: "approved", approved_by: managerId, approved_at: new Date().toISOString() })
-      .eq("id", shiftId);
-    if (error) throw error;
+    // The open-shift check and the approver stamp both happen in the database.
+    await call("approve_shift", { p_shift_id: shiftId, p_ok: true });
   }
   async function unapproveShift(shiftId) {
-    const { error } = await sb.from("timesheets")
-      .update({ status: "pending", approved_by: null, approved_at: null }).eq("id", shiftId);
-    if (error) throw error;
+    await call("approve_shift", { p_shift_id: shiftId, p_ok: false });
   }
 
   // Correct a shift's times — the forgotten clock-out. Stamps who changed it
@@ -961,15 +964,10 @@
     if (clockOutIso && hoursBetween(clockInIso, clockOutIso) > 16) {
       throw new Error("That shift is over 16 hours — check the date on the times.");
     }
-    const { error } = await sb.from("timesheets").update({
-      clock_in: clockInIso,
-      clock_out: clockOutIso || null,
-      note: note || null,
-      edited_by: editorId,
-      edited_at: new Date().toISOString(),
-      status: "pending", approved_by: null, approved_at: null
-    }).eq("id", shiftId);
-    if (error) throw error;
+    await call("edit_shift", {
+      p_shift_id: shiftId, p_clock_in: clockInIso,
+      p_clock_out: clockOutIso || null, p_note: note || null
+    });
   }
 
   /* ---- authorisation for hours above the roster ------------------------- */
@@ -993,11 +991,10 @@
     if (!by) throw new Error("Say who authorised it (Rad or Nikki).");
     if (evidence.length < 15) throw new Error("Paste the actual message — a few words isn't evidence.");
     if (!(extra > 0)) throw new Error("Extra hours must be more than zero.");
-    const { error } = await sb.from("hours_authorisations").insert({
-      va_id: a.vaId, week_start: a.weekStart, extra_hours: extra,
-      authorised_by: by, evidence: evidence, recorded_by: a.recordedBy || null
+    await call("record_authorisation", {
+      p_va_id: a.vaId, p_week_start: a.weekStart, p_extra_hours: extra,
+      p_authorised_by: by, p_evidence: evidence
     });
-    if (error) throw error;
   }
   // Hours this week that are covered: the roster, plus anything the client has
   // authorised on top of it.
@@ -1190,9 +1187,8 @@
     };
     if (!row.name)            throw new Error("Name is required.");
     if (!/^\d{4,6}$/.test(row.pin)) throw new Error("PIN must be 4–6 digits.");
-    const { data, error } = await sb.from("users").insert(row).select("id,name").single();
-    if (error) throw error;
-    return data;
+    const data = await call("create_member", { p_m: row });
+    return Array.isArray(data) ? data[0] : data;
   }
 
   // Reassign clinic / activate-deactivate a member.
@@ -1210,16 +1206,18 @@
     // an unassigned member's hours would otherwise never reach an invoice.
     if ("manager_id" in fields) patch.manager_id = fields.manager_id || null;
     if ("is_operator" in fields) patch.is_operator = !!fields.is_operator;
-    const { error } = await sb.from("users").update(patch).eq("id", userId);
-    if (error) throw error;
+    await call("update_member", { p_user_id: userId, p_f: patch });
   }
 
   // Reset any member's PIN (admin/manager), or your own ("Change my PIN").
   async function resetPin(userId, newPin) {
     const pin = String(newPin || "").trim();
     if (!/^\d{4,6}$/.test(pin)) throw new Error("PIN must be 4–6 digits.");
-    const { error } = await sb.from("users").update({ pin }).eq("id", userId);
-    if (error) throw error;
+    if (pin === "1234") throw new Error("Pick a PIN other than 1234.");
+    await call("reset_pin", { p_user_id: userId, p_pin: pin });
+    // Changing your own PIN clears the "still on 1234" gate.
+    const s = session();
+    if (s && s.id === userId && s.must_change_pin) { s.must_change_pin = false; setSession(s); }
   }
   const changeMyPin = resetPin;   // same operation, scoped to the caller's id
 
