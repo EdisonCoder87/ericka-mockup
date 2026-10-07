@@ -977,23 +977,61 @@
     const out = new Map();
     (vaIds || []).forEach(id => out.set(id, []));
     if (!vaIds || !vaIds.length) return out;
+    // Everything but the screenshot — that's a few hundred KB each, fetched
+    // only when someone opens it (authorisationScreenshot).
     const { data, error } = await sb.from("hours_authorisations")
-      .select("*").in("va_id", vaIds).eq("week_start", weekStartDate)
+      .select("id,va_id,week_start,extra_hours,authorised_by,reason,evidence,recorded_by,created_at")
+      .in("va_id", vaIds).eq("week_start", weekStartDate)
       .order("created_at");
     if (error) throw error;
     (data || []).forEach(r => { if (out.has(r.va_id)) out.get(r.va_id).push(r); });
     return out;
   }
+  async function authorisationScreenshot(id) {
+    const { data, error } = await sb.from("hours_authorisations")
+      .select("screenshot").eq("id", id).single();
+    if (error) throw error;
+    return data && data.screenshot;
+  }
+  // The proof is a screenshot of the practice manager approving the hours, plus
+  // the reason. Shrunk to a JPEG in the browser so a phone screenshot doesn't
+  // land in the database at 4 MB.
+  function compressScreenshot(file, maxSide = 1400, quality = 0.8) {
+    return new Promise(function (resolve, reject) {
+      if (!file || !/^image\//.test(file.type)) {
+        return reject(new Error("That isn't an image. Attach a screenshot."));
+      }
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = function () {
+        const k = Math.min(1, maxSide / Math.max(img.width, img.height));
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        const g = c.getContext("2d");
+        g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+        g.drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        reject(new Error("Couldn't read that image. Try a PNG or JPG screenshot."));
+      };
+      img.src = url;
+    });
+  }
   async function recordAuthorisation(a) {
-    const evidence = (a.evidence || "").trim();
+    const reason = (a.reason || "").trim();
     const by = (a.authorisedBy || "").trim();
     const extra = Number(a.extraHours);
-    if (!by) throw new Error("Say who authorised it (Rad or Nikki).");
-    if (evidence.length < 15) throw new Error("Paste the actual message — a few words isn't evidence.");
+    if (!by) throw new Error("Say which practice manager approved it.");
+    if (!a.screenshot) throw new Error("Attach the screenshot of the practice manager approving the hours.");
+    if (reason.length < 10) throw new Error("Give the reason for the extra hours.");
     if (!(extra > 0)) throw new Error("Extra hours must be more than zero.");
     await call("record_authorisation", {
       p_va_id: a.vaId, p_week_start: a.weekStart, p_extra_hours: extra,
-      p_authorised_by: by, p_evidence: evidence
+      p_authorised_by: by, p_reason: reason, p_screenshot: a.screenshot,
+      p_evidence: (a.evidence || "").trim() || null
     });
   }
   // Hours this week that are covered: the roster, plus anything the client has
@@ -1242,6 +1280,7 @@
     DAY_NAMES, timeToHours, shiftLength, fmtTime, rosterForMany, saveRoster, rosterByDay,
     teamForManager, shiftsInRange, approveShift, unapproveShift, editShift,
     authorisationsFor, recordAuthorisation, authorisedCeiling,
+    authorisationScreenshot, compressScreenshot,
     payCycle, xeroInvoiceCsv, payoutCsv, detailCsv, downloadCsv, toCsv, auDate,
     isOperator, canApprove,
     // small helper: bail out gracefully if keys aren't set yet

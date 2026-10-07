@@ -236,11 +236,12 @@
       } else if (over > TOL) {
         bar = '<div class="warnbar"><span>⚠️ <b>' + round1(over) + ' h over</b> the ' +
               round1(w.ceiling) + ' h covered this week. ' +
-              'Record Rad or Nikki’s authorisation before approving the extra.</span>' +
+              'Record the practice manager’s authorisation (screenshot + reason) before approving the extra.</span>' +
               '<button class="rowbtn" data-auth="' + p.id + '">Record authorisation</button></div>';
       } else if (w.auths.length) {
-        bar = '<div class="okbar">✅ ' + w.auths.map(a => round1(a.extra_hours) + ' h extra authorised by ' +
-              esc(a.authorised_by)).join(' · ') + '</div>';
+        bar = '<div class="okbar">✅ ' + w.auths.map(a => '<a href="#" data-viewauth="' + a.id + '" ' +
+              'style="color:inherit">' + round1(a.extra_hours) + ' h extra authorised by ' +
+              esc(a.authorised_by) + '</a>').join(' · ') + '</div>';
       }
 
       const rows = w.list.length ? w.list.map(function (x) {
@@ -328,6 +329,11 @@
     document.querySelectorAll('[data-auth]').forEach(b => b.onclick = function () {
       openAuth(team.find(t => t.id === this.dataset.auth));
     });
+    document.querySelectorAll('[data-viewauth]').forEach(b => b.onclick = function (e) {
+      e.preventDefault();
+      const all = [].concat(...auths.values());
+      viewAuth(all.find(a => a.id === this.dataset.viewauth));
+    });
   }
 
   // <input type="datetime-local"> wants local wall-clock with no zone.
@@ -392,29 +398,61 @@
           esc(a.authorised_by)).join(', ') + '. Only add another if this is a <i>separate</i> request — ' +
           'they add together.</div>'
         : '') +
-      '<label class="mini">Who authorised it</label>' +
-      '<select id="a-by" style="padding:10px 11px">' + clientContactOpts() + '</select>' +
+      '<label class="mini">Practice manager who approved it</label>' +
+      '<input id="a-by" list="a-by-list" placeholder="Name of the practice manager" style="padding:10px 11px">' +
+      '<datalist id="a-by-list">' + clientContactOpts() + '</datalist>' +
       '<label class="mini" style="display:block;margin-top:12px">Extra hours authorised</label>' +
       '<input id="a-hrs" type="number" min="0.25" max="60" step="0.25" value="' + Math.max(0.25, over) + '" style="padding:10px 11px">' +
-      '<label class="mini" style="display:block;margin-top:12px">Paste their message</label>' +
-      '<textarea id="a-ev" rows="5" placeholder="Paste the message from Rad or Nikki asking for the extra hours." ' +
+      '<label class="mini" style="display:block;margin-top:12px">Screenshot of the approval</label>' +
+      '<div id="a-drop" tabindex="0" style="border:2px dashed var(--line);border-radius:var(--r-sm);padding:14px;' +
+        'text-align:center;font-size:13px;color:var(--grey);cursor:pointer">' +
+        '<b>Tap to attach</b> or paste (Ctrl+V) the screenshot of the practice manager approving the hours' +
+        '<input id="a-file" type="file" accept="image/*" style="display:none"></div>' +
+      '<img id="a-prev" alt="" style="display:none;max-width:100%;max-height:260px;margin-top:8px;border:1px solid var(--line);border-radius:8px">' +
+      '<label class="mini" style="display:block;margin-top:12px">Reason for the extra hours</label>' +
+      '<textarea id="a-why" rows="3" placeholder="e.g. Covering Leemay on leave Thursday, recall backlog before month end" ' +
         'style="width:100%;padding:10px 11px;font-family:var(--f-body);font-size:13.5px;border:1px solid var(--line);' +
         'border-radius:var(--r-sm);resize:vertical"></textarea>' +
-      '<p style="font-size:11.5px;color:var(--grey);margin-top:8px">This is the record that the client asked for the ' +
-        'extra time. It stays attached to this week and shows on the invoice trail.</p>' +
+      '<p style="font-size:11.5px;color:var(--grey);margin-top:8px">This is the record that the practice asked for the ' +
+        'extra time. It stays attached to this week and shows on the invoice trail. It can\'t be edited once saved.</p>' +
       '<div style="display:flex;align-items:center;gap:12px;margin-top:16px">' +
         '<button id="a-save" class="btn btn-primary" style="padding:11px 24px">Record authorisation</button>' +
         '<span id="a-msg" style="font-size:13px;font-weight:700"></span></div>';
     document.getElementById('modal').style.display = 'flex';
+
+    let shot = null;
+    const drop = document.getElementById('a-drop'), file = document.getElementById('a-file');
+    const prev = document.getElementById('a-prev'), amsg = document.getElementById('a-msg');
+    async function takeImage(f) {
+      amsg.textContent = '';
+      try {
+        shot = await ericka.compressScreenshot(f);
+        prev.src = shot; prev.style.display = 'block';
+        drop.querySelector('b').textContent = 'Screenshot attached ✓ — tap to change';
+      } catch (e) { amsg.style.color = 'var(--danger)'; amsg.textContent = e.message; }
+    }
+    drop.onclick = function (e) { if (e.target !== file) file.click(); };
+    file.onchange = function () { if (file.files[0]) takeImage(file.files[0]); };
+    document.getElementById('m-body').onpaste = function (e) {
+      const item = [...(e.clipboardData || {}).items || []].find(i => i.type.indexOf('image/') === 0);
+      if (item) { e.preventDefault(); takeImage(item.getAsFile()); }
+    };
+    drop.ondragover = function (e) { e.preventDefault(); };
+    drop.ondrop = function (e) {
+      e.preventDefault();
+      if (e.dataTransfer.files[0]) takeImage(e.dataTransfer.files[0]);
+    };
+
     document.getElementById('a-save').onclick = async function () {
-      const msg = document.getElementById('a-msg');
+      const msg = amsg;
       this.disabled = true;
       try {
         await ericka.recordAuthorisation({
           vaId: p.id, weekStart: dateKey(weekMon),
           extraHours: document.getElementById('a-hrs').value,
           authorisedBy: document.getElementById('a-by').value,
-          evidence: document.getElementById('a-ev').value,
+          reason: document.getElementById('a-why').value,
+          screenshot: shot,
           recordedBy: s.id
         });
         document.getElementById('modal').style.display = 'none';
@@ -424,6 +462,30 @@
         this.disabled = false;
       }
     };
+  }
+
+  // The record itself: who, how many hours, why, and the screenshot.
+  async function viewAuth(a) {
+    document.getElementById('m-body').innerHTML =
+      '<div class="mini">Extra hours authorisation</div>' +
+      '<div style="font-family:var(--f-display);font-weight:600;font-size:18px;margin:2px 0 8px">' +
+        round1(a.extra_hours) + ' h approved by ' + esc(a.authorised_by) + '</div>' +
+      (a.reason ? '<div style="font-size:13.5px;margin-bottom:10px"><b>Reason:</b> ' + esc(a.reason) + '</div>' : '') +
+      (a.evidence ? '<div style="font-size:12.5px;color:var(--grey);white-space:pre-wrap;margin-bottom:10px">' +
+        esc(a.evidence) + '</div>' : '') +
+      '<div style="font-size:11.5px;color:var(--grey);margin-bottom:10px">Recorded ' +
+        new Date(a.created_at).toLocaleString() + '</div>' +
+      '<div id="v-shot" style="font-size:13px;color:var(--grey)">Loading screenshot…</div>';
+    document.getElementById('modal').style.display = 'flex';
+    try {
+      const src = await ericka.authorisationScreenshot(a.id);
+      document.getElementById('v-shot').innerHTML = src
+        ? '<a href="' + src + '" target="_blank"><img src="' + src + '" alt="Approval screenshot" ' +
+          'style="max-width:100%;border:1px solid var(--line);border-radius:8px"></a>'
+        : 'No screenshot — recorded before screenshots were required.';
+    } catch (e) {
+      document.getElementById('v-shot').textContent = 'Couldn\'t load the screenshot: ' + (e.message || e);
+    }
   }
 
   document.getElementById('wk-prev').onclick = function () {
