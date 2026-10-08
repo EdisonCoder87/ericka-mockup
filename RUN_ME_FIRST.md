@@ -29,6 +29,7 @@ SUPABASE_PAT=sbp_… node run_migrations.js <file.sql>
 | 17 | `migration_17_clean_names.sql` | real names only (drops "(SIA Medical)" etc.) · demo accounts deactivated |
 | 21 | `migration_21_session_lockdown.sql` | **security: every write needs a signed-in session token + role check · PIN lockout · RLS on · 1234 must be changed** |
 | 22 | `migration_22_auth_screenshot.sql` | extra-hours authorisation needs a **screenshot of the practice manager approving + a reason** (message now optional) · ship WITH the 12_approvals.html / app.js change |
+| 23 | `migration_23_working_with_aussies.sql` | onboarding module **Working with Australian Businesses** (shared, all VAs) at position 2 · 12 sections + 8-Q quiz · re-runnable |
 
 **🔒 Since 21, the browser can't write to any table directly.** A new write = a new
 `security definer` function that starts with `_session_user(p_token)`, and a new table must
