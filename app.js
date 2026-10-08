@@ -748,7 +748,9 @@
           evidencePrompt: m.evidence_prompt,
           done: doneSet.has(m.id),
           evidenceUrl: r ? r.evidence_url : null,
-          verifiedAt: r ? r.verified_at : null
+          verifiedAt: r ? r.verified_at : null,
+          score: r && r.score != null ? r.score : null,
+          completedAt: r ? r.completed_at : null
         };
       })
     };

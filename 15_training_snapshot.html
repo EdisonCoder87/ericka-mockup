@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Training Snapshot — Ericka Portal</title>
+<link rel="stylesheet" href="ericka.css">
+<style>
+  .wrap.wide{max-width:none}
+  .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .toolbar .seg a{display:inline-block;padding:8px 16px;border-radius:var(--r-pill);font-size:13px;font-weight:700;
+    text-decoration:none;color:var(--grey);background:#fff;border:1px solid var(--line);margin-right:6px}
+  .toolbar .seg a.on{background:var(--violet);border-color:var(--violet);color:#fff}
+  .toolbar select{width:auto;margin-left:auto;padding:8px 12px;border-radius:10px;border:1px solid var(--line);font:inherit;font-size:13px;background:#fff}
+  .grid-box{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table.snap{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
+  table.snap th,table.snap td{padding:7px 3px;text-align:center;border-bottom:1px solid var(--line);white-space:nowrap;background:#fff}
+  table.snap thead th{background:var(--cream);font-size:11px;font-weight:700;color:var(--grey);position:sticky;top:0;z-index:2}
+  table.snap thead tr.grp th{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--violet-d);border-bottom:none}
+  table.snap .nm{position:sticky;left:0;z-index:1;text-align:left;padding-left:16px;min-width:150px;border-right:1px solid var(--line)}
+  table.snap thead .nm{z-index:3}
+  table.snap td.nm b{display:block;font-size:13.5px;color:var(--ink)}
+  table.snap td.nm span{font-size:11px;color:var(--grey)}
+  table.snap th.gs,table.snap td.gs{border-left:2px solid var(--line)}
+  .c{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+  .c.done{background:#e4f4ec;color:var(--ok)}
+  .c.wait{background:#fdf2e0;color:var(--warn)}
+  .c.todo{background:var(--cream);border:1.5px dashed var(--line);color:transparent}
+  .c small{font-size:9.5px}
+  .pct{min-width:110px;padding-left:10px!important;padding-right:12px!important}
+  .pct .pbar{margin-top:5px;height:6px}
+  .pct .t{font-weight:700;font-size:12.5px}
+  .cert{display:inline-block;margin-top:3px;font-size:10px;font-weight:700;color:var(--ok)}
+  .legend{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:4px 18px;padding:18px 20px;font-size:12.5px}
+  .legend h4{grid-column:1/-1;margin:10px 0 2px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--violet-d)}
+  .legend div{color:var(--ink)} .legend b{color:var(--grey);display:inline-block;min-width:30px}
+  .key{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--grey);margin:12px 2px 0}
+  .key span{display:inline-flex;align-items:center;gap:6px}
+  @media(max-width:900px){ .wrap.wide{padding-left:16px;padding-right:16px}
+    table.snap .nm{min-width:120px;padding-left:10px} table.snap th,table.snap td{padding:6px 4px}
+    .toolbar select{margin-left:0} }
+</style>
+</head>
+<body>
+
+<input type="checkbox" id="navtog">
+<div class="app-topbar">
+  <label class="burger" for="navtog"><span></span><span></span><span></span></label>
+  <div class="wm rev">Erick<span class="a">a</span></div>
+</div>
+
+<nav class="app-sidebar">
+  <div class="sidebar-brand">
+    <div class="wm rev">Erick<span class="a">a</span></div>
+    <svg class="pulse" viewBox="0 0 90 14" preserveAspectRatio="none"><path d="M2 7 H32 l4 -5 l5 10 l4 -8 l3 3 H88"/></svg>
+  </div>
+  <div class="nav-group-label">Manage</div>
+  <a id="nav-home" href="02_home.html"><span class="ic">🏠</span> Home</a>
+  <a href="10_team.html"><span class="ic">👥</span> Team</a>
+  <a href="09_roster.html"><span class="ic">🗓️</span> Roster</a>
+  <a id="nav-appr" href="12_approvals.html" style="display:none"><span class="ic">✅</span> Approvals</a>
+  <a id="nav-mine" href="07_va_timesheet.html" style="display:none"><span class="ic">🕑</span> My Timesheet</a>
+  <a id="nav-exp" href="13_export.html" style="display:none"><span class="ic">📤</span> Pay Cycle</a>
+  <a href="performance.html"><span class="ic">📊</span> Performance</a>
+  <a href="14_review_training.html"><span class="ic">📚</span> Review Training</a>
+  <a id="nav-snap-medical" href="15_training_snapshot.html?v=medical"><span class="ic">🩺</span> Medical VA Snapshot</a>
+  <a id="nav-snap-dental" href="15_training_snapshot.html?v=dental"><span class="ic">🦷</span> Dental VA Snapshot</a>
+  <a id="nav-admin" href="11_admin.html" style="display:none"><span class="ic">⚙️</span> Admin</a>
+  <a href="01_welcome.html" class="logout" onclick="ericka.logout();return false;"><span class="ic">↩</span> Sign out</a>
+</nav>
+
+<div class="page">
+  <div class="hero">
+    <div class="hero-inner">
+      <div class="hero-left">
+        <div class="hero-label" id="h-label">Training snapshot</div>
+        <h1 class="hero-name" id="h-name">Who has done what</h1>
+        <p class="hero-tagline">Every member down the side, every module across the top. Green is done, amber is waiting on a manager's sign-off, empty is still to do.</p>
+      </div>
+      <div class="hero-right">
+        <div class="stat"><div class="v" id="s-vas">–</div><div class="l">Members</div></div>
+        <div class="stat"><div class="v" id="s-onb">–</div><div class="l">Onboarded</div></div>
+        <div class="stat"><div class="v" id="s-trn">–</div><div class="l">Training done</div></div>
+        <div class="stat"><div class="v" id="s-ai">–</div><div class="l">AI certified</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap wide">
+    <div class="toolbar">
+      <div class="seg">
+        <a id="seg-medical" href="15_training_snapshot.html?v=medical">🩺 Medical</a>
+        <a id="seg-dental" href="15_training_snapshot.html?v=dental">🦷 Dental</a>
+      </div>
+      <select id="sort">
+        <option value="behind">Sort: furthest behind first</option>
+        <option value="ahead">Sort: most progress first</option>
+        <option value="name">Sort: name</option>
+        <option value="site">Sort: site</option>
+      </select>
+    </div>
+    <div id="board" class="panel"><div style="padding:26px;color:var(--grey)">Loading the team…</div></div>
+    <div class="key">
+      <span><i class="c done">✓</i> Done (quiz score shown when there is one)</span>
+      <span><i class="c wait">⏳</i> Practical submitted, sign-off due</span>
+      <span><i class="c todo"></i> To do</span>
+    </div>
+    <div id="legend" class="panel" style="margin-top:18px"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+(async function () {
+  if (!ericka.ready()) return;
+  const s = ericka.requireRole(['admin','team_lead','manager']);
+  if (!s) return;
+  document.getElementById('nav-home').href = ericka.homeFor(s.role);
+  if (s.role === 'admin' || s.role === 'manager') document.getElementById('nav-admin').style.display = '';
+  if (ericka.canApprove(s)) {
+    document.getElementById('nav-appr').style.display = '';
+    document.getElementById('nav-exp').style.display = '';
+  }
+  if (ericka.isOperator(s)) document.getElementById('nav-mine').style.display = '';
+
+  const v = new URLSearchParams(location.search).get('v') === 'dental' ? 'dental' : 'medical';
+  const label = v === 'dental' ? 'Dental' : 'Medical';
+  document.title = label + ' VA Snapshot — Ericka Portal';
+  document.getElementById('h-label').textContent = label + ' VA snapshot';
+  document.getElementById('nav-snap-' + v).classList.add('active');
+  document.getElementById('seg-' + v).classList.add('on');
+
+  const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const fmtDate = d => d ? new Date(d).toLocaleDateString('en-AU', {day:'numeric', month:'short'}) : '';
+
+  const SORT_KEY = 'ericka.snapshot.sort';
+  const sortSel = document.getElementById('sort');
+  try { const saved = localStorage.getItem(SORT_KEY); if (saved) sortSel.value = saved; } catch (e) {}
+
+  let team, mods;
+  try {
+    team = (await ericka.teamBoard(false)).filter(m => (m.vertical || 'medical') === v);
+    mods = await ericka.modulesFor(v);
+  } catch (e) {
+    document.getElementById('board').innerHTML =
+      '<div style="padding:26px;color:var(--danger)">Couldn\'t load the team: ' + esc(e.message || e) + '</div>';
+    return;
+  }
+
+  const GROUPS = [
+    { cat: 'onboarding', name: 'Onboarding', pfx: 'O' },
+    { cat: 'training',   name: 'Training',   pfx: 'T' },
+    { cat: 'ai',         name: 'AI certification', pfx: 'A' }
+  ].map(g => Object.assign(g, { mods: mods.filter(m => m.category === g.cat) }))
+   .filter(g => g.mods.length);
+
+  // ---- headline stats -------------------------------------------------------
+  const aiCert = m => m.badges && m.badges.length && m.badges.every(b => b.earned);
+  document.getElementById('s-vas').textContent = team.length;
+  document.getElementById('s-onb').textContent = team.filter(m => m.onbTotal && m.onbDone === m.onbTotal).length;
+  document.getElementById('s-trn').textContent = team.filter(m => m.trnTotal && m.trnDone === m.trnTotal).length;
+  document.getElementById('s-ai').textContent  = team.filter(aiCert).length;
+
+  // ---- legend (tap-friendly: no hover needed on a phone) -------------------
+  document.getElementById('legend').innerHTML = '<div class="legend">' + GROUPS.map(g =>
+    '<h4>' + g.name + '</h4>' + g.mods.map((m, i) =>
+      '<div><b>' + g.pfx + (i + 1) + '</b>' + esc(m.icon || '') + ' ' + esc(m.title) + '</div>').join('')
+  ).join('') + '</div>';
+
+  function pctOf(m) { return m.modulesTotal ? Math.round(100 * m.modulesDone / m.modulesTotal) : 0; }
+
+  function cell(mod, isFirst) {
+    const cls = isFirst ? ' class="gs"' : '';
+    if (!mod) return '<td' + cls + '><i class="c todo"></i></td>';
+    const pending = mod.requiresEvidence && mod.done && !mod.verifiedAt;
+    if (pending)
+      return '<td' + cls + ' title="' + esc(mod.title) + ' · sign-off due"><i class="c wait">⏳</i></td>';
+    if (mod.done) {
+      const tip = esc(mod.title) + (mod.score != null ? ' · ' + mod.score + '%' : '') +
+                  (mod.completedAt ? ' · ' + fmtDate(mod.completedAt) : '');
+      return '<td' + cls + ' title="' + tip + '"><i class="c done">' +
+             (mod.score != null ? '<small>' + mod.score + '</small>' : '✓') + '</i></td>';
+    }
+    return '<td' + cls + ' title="' + esc(mod.title) + ' · to do"><i class="c todo"></i></td>';
+  }
+
+  function draw() {
+    if (!team.length) {
+      document.getElementById('board').innerHTML =
+        '<div style="padding:26px;color:var(--grey)">No active ' + label.toLowerCase() + ' members yet.</div>';
+      return;
+    }
+    const how = sortSel.value;
+    const rows = team.slice().sort((a, b) =>
+      how === 'behind' ? pctOf(a) - pctOf(b) || a.name.localeCompare(b.name) :
+      how === 'ahead'  ? pctOf(b) - pctOf(a) || a.name.localeCompare(b.name) :
+      how === 'site'   ? a.site.localeCompare(b.site) || a.name.localeCompare(b.name) :
+                         a.name.localeCompare(b.name));
+
+    let h = '<div class="grid-box"><table class="snap"><thead><tr class="grp"><th class="nm"></th>';
+    GROUPS.forEach(g => { h += '<th class="gs" colspan="' + g.mods.length + '">' + g.name + '</th>'; });
+    h += '<th class="gs"></th></tr><tr><th class="nm">Member</th>';
+    GROUPS.forEach(g => g.mods.forEach((m, i) => {
+      h += '<th' + (i === 0 ? ' class="gs"' : '') + ' title="' + esc(m.title) + '">' + g.pfx + (i + 1) + '</th>';
+    }));
+    h += '<th class="gs pct">Overall</th></tr></thead><tbody>';
+
+    rows.forEach(r => {
+      const byId = {};
+      (r.modules || []).forEach(m => { byId[m.id] = m; });
+      const p = pctOf(r);
+      const allDone = r.modulesTotal && r.modulesDone === r.modulesTotal;
+      h += '<tr><td class="nm"><b>' + esc(r.name) + '</b><span>' + esc(r.site) + '</span></td>';
+      GROUPS.forEach(g => g.mods.forEach((m, i) => { h += cell(byId[m.id], i === 0); }));
+      h += '<td class="gs pct"><div class="t">' + r.modulesDone + ' / ' + r.modulesTotal + ' · ' + p + '%</div>' +
+           '<div class="pbar"><span style="width:' + p + '%"></span></div>' +
+           (allDone ? '<span class="cert">🏆 Fully certified</span>' : '') + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+    document.getElementById('board').innerHTML = h;
+  }
+
+  sortSel.onchange = function () {
+    try { localStorage.setItem(SORT_KEY, sortSel.value); } catch (e) {}
+    draw();
+  };
+  draw();
+})();
+</script>
+</body>
+</html>

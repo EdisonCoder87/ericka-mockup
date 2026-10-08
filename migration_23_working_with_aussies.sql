@@ -19,7 +19,7 @@ begin
      where category = 'onboarding' and vertical in ('medical','dental') and ord >= 2;
     insert into training_modules (id, vertical, category, ord, title, icon, capability_label, summary)
     values ('a5000000-0000-0000-0000-000000000001', 'all', 'onboarding', 2,
-            'Working with Australian Businesses', '🇦🇺', 'Australian Workplace Ready',
+            'Working with Australian Businesses', '🌏', 'Australian Workplace Ready',
             'In Australia a "yes" is a promise. Learn the 10 things Australian owners expect, and the questions to ask before you say yes.');
   end if;
 end $$;
