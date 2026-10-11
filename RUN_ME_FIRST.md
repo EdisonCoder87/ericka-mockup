@@ -30,6 +30,7 @@ SUPABASE_PAT=sbp_… node run_migrations.js <file.sql>
 | 21 | `migration_21_session_lockdown.sql` | **security: every write needs a signed-in session token + role check · PIN lockout · RLS on · 1234 must be changed** |
 | 22 | `migration_22_auth_screenshot.sql` | extra-hours authorisation needs a **screenshot of the practice manager approving + a reason** (message now optional) · ship WITH the 12_approvals.html / app.js change |
 | 23 | `migration_23_working_with_aussies.sql` | onboarding module **Working with Australian Businesses** (shared, all VAs) at position 2 · 12 sections + 8-Q quiz · re-runnable · icon 🌏 |
+| 24 | `migration_24_ericka_medina.sql` | adds **Ericka Medina** as an owner-tier admin (all timesheets + invoice export) on PIN 1234, forced change at first login |
 
 **🔒 Since 21, the browser can't write to any table directly.** A new write = a new
 `security definer` function that starts with `_session_user(p_token)`, and a new table must
@@ -54,7 +55,7 @@ dropdown, type 1234. Each person changes theirs on first login — client and VA
 
 | Tier | Who |
 |---|---|
-| Owner (`admin`) | Edison Nguyen · Grace Sia |
+| Owner (`admin`) | Edison Nguyen · Grace Sia · Ericka Medina (timesheets + invoicing) |
 | Ericka Manager (`manager`) | Shane · Sharica |
 | Client (`client_admin`, view only) | Nikki · Radmila Dusanovic |
 | Remote member (`va`) | the real team |
