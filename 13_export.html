@@ -73,6 +73,7 @@
       <div class="mini" style="margin-bottom:12px">Period</div>
       <div class="fbox">
         <div><label class="mini">Bill to</label><select id="f-client" style="padding:10px 11px"></select></div>
+        <div><label class="mini">Site</label><select id="f-site" style="padding:10px 11px"><option value="">All sites</option></select></div>
         <div><label class="mini">From</label><input id="f-from" type="date" style="padding:10px 11px"></div>
         <div><label class="mini">To (inclusive)</label><input id="f-to" type="date" style="padding:10px 11px"></div>
         <div style="flex:0 0 auto"><button class="btn btn-primary" id="f-go" style="padding:11px 24px">Load period</button></div>
@@ -109,7 +110,8 @@
       </div>
       <p style="font-size:12px;color:var(--grey);margin-top:4px">
         Terms are <b>7 days</b> per the MSA (cl 4.3) — the due date fills in automatically.
-        One invoice, one line per team member, matching invoice&nbsp;#01 to Newwin Consulting.
+        One invoice, one line per team member. Pick a <b>Site</b> above to bill each clinic on its own invoice
+        (give each its own number).
       </p>
     </div>
 
@@ -167,7 +169,9 @@
   // rows      = the people on the selected client — these build the invoice.
   // payRows    = every active member — these get PAID, whoever they bill to.
   // Kem is the reason these differ: she sits on Newwin Consulting, not SIA Medical.
-  let rows = [], payRows = [], detail = new Map(), period = { from: null, to: null };
+  // clientRows = everyone on the client; rows = clientRows narrowed to the Site picker.
+  let rows = [], clientRows = [], payRows = [], detail = new Map(), period = { from: null, to: null };
+  let site = '';
   let datesTouched = false;
   let clientId = ericka.SIA_MEDICAL_CLIENT_ID, clientName = 'SIA Medical';
 
@@ -215,6 +219,7 @@
       '<option value="">General VAs (no client)</option>';
     sel.onchange = function () {
       clientId = this.value || null;
+      site = '';
       clientName = this.options[this.selectedIndex].text;
       const c = document.getElementById('x-contact');
       if (clientId) c.value = clientName;
@@ -232,8 +237,10 @@
     // One invoice per client; one payout run for the whole team.
     const all = await ericka.payCycle(null, period.from, period.to);
     payRows = all;
-    rows = clientId ? all.filter(r => r.client_id === clientId)
-                    : all.filter(r => !r.client_id);
+    clientRows = clientId ? all.filter(r => r.client_id === clientId)
+                          : all.filter(r => !r.client_id);
+    fillSites();
+    applySite();
 
     const endEx = new Date(period.to + 'T00:00:00'); endEx.setDate(endEx.getDate() + 1);
     detail = await ericka.shiftsInRange(all.map(r => r.id),
@@ -298,7 +305,17 @@
     document.getElementById('dl-pay').disabled    = !payRows.some(r => r.approvedHours > 0);
   }
 
-  function stamp() { return period.from + '_to_' + period.to; }
+  // Sites on the selected client, so each clinic can be invoiced on its own.
+  function fillSites() {
+    const sites = [...new Set(clientRows.map(r => r.site).filter(Boolean))].sort();
+    if (site && sites.indexOf(site) === -1) site = '';
+    document.getElementById('f-site').innerHTML = '<option value="">All sites</option>' +
+      sites.map(x => '<option' + (x === site ? ' selected' : '') + '>' + esc(x) + '</option>').join('');
+  }
+  function applySite() { rows = site ? clientRows.filter(r => r.site === site) : clientRows; }
+
+  function stamp() { return (site ? site.toLowerCase().replace(/[^a-z0-9]+/g, '_') + '_' : '') +
+    period.from + '_to_' + period.to; }
 
   document.getElementById('dl-xero').onclick = function () {
     const no = document.getElementById('x-no').value.trim();
@@ -307,7 +324,7 @@
       ericka.xeroInvoiceCsv(rows, {
         contactName: document.getElementById('x-contact').value.trim(),
         invoiceNumber: no,
-        reference: 'VA services ' + periodLabel(),
+        reference: 'VA services ' + (site ? site + ' ' : '') + periodLabel(),
         invoiceDate: document.getElementById('x-date').value,
         dueDate: document.getElementById('x-due').value,
         accountCode: document.getElementById('x-acct').value.trim(),
@@ -319,12 +336,13 @@
     ericka.downloadCsv('hours_' + period.to + '.csv', ericka.payoutCsv(payRows));
   };
   document.getElementById('dl-detail').onclick = function () {
-    ericka.downloadCsv('timesheet_detail_' + stamp() + '.csv', ericka.detailCsv(payRows, detail));
+    ericka.downloadCsv('timesheet_detail_' + period.from + '_to_' + period.to + '.csv', ericka.detailCsv(payRows, detail));
   };
 
   ['x-date','x-due'].forEach(id =>
     document.getElementById(id).addEventListener('input', () => { datesTouched = true; }));
   await loadClients();
+  document.getElementById('f-site').onchange = function () { site = this.value; applySite(); render(); };
   document.getElementById('f-go').onclick = load;
   document.querySelectorAll('[data-quick]').forEach(b => b.onclick = function () { quick(this.dataset.quick); });
   load();
